@@ -81,7 +81,8 @@ class PacketParser(object):
             return bytes.read(8*4).uint
         
         else:
-            raise NotImplementedError("Sorry, gpglib doesn't know about indeterminate lengths yet...")
+            # Indeterminate length untill the end of the file
+            return None
 
 if __name__ == '__main__':
     key = RSA.importKey(open('../tests/data/gpg/key.asc').read())

@@ -8,7 +8,11 @@ class ContentParser(object):
         
     def consume(self, tag, info):
         parser = self.parsers.get(tag.tag_type, self.parse_unknown)
-        return parser.consume(tag, info, info.bytes.read(tag.body_bit_length * 8))
+        bytes = info.bytes
+        if tag.body_bit_length:
+            # This packet has a defined length, let's only consume those bytes
+            bytes = info.bytes.read(tag.body_bit_length * 8)
+        return parser.consume(tag, info, bytes)
     
     def add_parser(self, key_id, parser):
         self.parsers[key_id] = parser
