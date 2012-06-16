@@ -4,7 +4,6 @@ import bitstring
 from content_parsers import ContentParser
 from errors import PGPFormatException
 from structures import Tag, Info
-import utils
 
 class PacketParser(object):
     def __init__(self, keys):
@@ -71,15 +70,15 @@ class PacketParser(object):
         """Determine body length of an old style packet"""
         if length_type == 0:
             # One Octet length
-            return utils.read_scalar(1, bytes)
+            return bytes.read(8).uint
         
         elif length_type == 1:
             # Two Octet length
-            return utils.read_scalar(2, bytes)
+            return bytes.read(8*2).uint
         
         elif length_type == 2:
             # Four Octet length
-            return utils.read_scalar(4, bytes)
+            return bytes.read(8*4).uint
         
         else:
             raise NotImplementedError("Sorry, gpglib doesn't know about indeterminate lengths yet...")
