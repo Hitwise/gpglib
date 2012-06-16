@@ -6,3 +6,36 @@ We couldn't find a library for decrypting gpg that didn't shell out to gpg.
 And shelling out to gpg is slow when you do it for many small files.
 
 So, with the help of http://pypi.python.org/pypi/OpenPGP and PyCrypto we created this, which is more performant than shelling out....
+
+
+Making test data
+================
+
+This is what I did to get the data in test.data
+
+inside tests/data::
+
+    $ gpg --gen-key --homedir ./gpg
+    # I gave it all default options, username Stephen and password "blahandstuff"
+
+Then find the keyid::
+
+    $ gpg --homedir ./gpg --list-keys
+        #     ./gpg/pubring.gpg
+        # -----------------
+        # pub   2048R/1E42B68C 2012-06-15
+        # uid                  Stephen
+        # sub   2048R/80C7020A 2012-06-15
+    # Here, the key we want is "80C7020A"
+    
+Then with that keyid (after installing monkeysphere so I can have openpgp2ssh) ::
+
+    $ echo "blahandstuff" > pw
+    $ gpg --passphrase-fd 3 3<pw --export-options export-reset-subkey-passwd --homedir ./gpg --export-secret-subkeys 80C7020A | openpgp2ssh 80C7020A > gpg/key.asc
+    $ rm pw
+
+Note that the pw stuff is because openpgp2ssh will otherwise complain with "we cannot handle encrypted secret keys".
+
+I then created data.dump as one of the examples on http://json.org/example.html and did the following to make data.dump.gpg::
+    
+    $ gpg -o data.dump.gpg --cipher-algo CAST5 --compress-algo ZLIB --yes --homedir ./gpg  -r Stephen --encrypt data.dump
