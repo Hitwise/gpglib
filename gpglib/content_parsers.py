@@ -18,7 +18,13 @@ class ContentParser(object):
         self.parsers[key_id] = parser
     
     def find_parsers(self):
-        self.add_parser(1, PubSessionKeyParser())
+        parsers = (
+              (1, PubSessionKeyParser)
+            , (18, SymEncryptedIntegretyProtectedParser)
+            )
+        
+        for tag_type, kls in parsers:
+            self.add_parser(tag_type, kls())
 
 class Parser(object):
     """Base Parser class"""
@@ -64,3 +70,8 @@ class PubSessionKeyParser(Parser):
         # Give session key to info
         info.public_session_key = bitstring.ConstBitStream(bytes=session_key).uint
         return info.public_session_key
+        
+class SymEncryptedIntegretyProtectedParser(Parser):
+    """Parse public session key packet"""
+    def consume(self, tag, info, bytes):
+        print bytes.read(60)
