@@ -44,13 +44,24 @@ class PacketParser(object):
         else:
             return self.next_old_tag(tag, info)
     
-    def next_new_tag(self, bytes, info):
-        # TODO: Implement the new length format when we find the need to
-        raise NotImplementedError("The new PGP length format is not handled yet")
+    def next_new_tag(self, tag, info):
+        """
+            6 bits left to parse in the tag
+            All 6 bits become the content type
+            The length of the packet is then determined by the next group of bytes
+        """
+        tag_type = tag.read(6).uint
+        
+        # We peek at the next byte to determine what type of length to get
+        length_type = info.bytes.peek(8).uint
+        body_bit_length = self.determine_new_body_length(length_type, info.bytes)
+        
+        # Return the tag
+        return Tag(version=1, tag_type=tag_type, body_bit_length=body_bit_length)
         
     def next_old_tag(self, tag, info):
         """
-            6 bytes left to parse in the tag
+            6 bits left to parse in the tag
             Type is the first four
             and length is determined by the two after that
         """
@@ -83,6 +94,30 @@ class PacketParser(object):
         else:
             # Indeterminate length untill the end of the file
             return None
+    
+    def determine_new_body_length(self, length_type, bytes):
+        """
+            The first byte (given as length_type, which is still on bytes) is used to determine how many to look at
+            < 192 = one octet
+            > 192 and < 224  = two octet
+            == 255 = ignore the 255, and use the next 4 octets
+            otherwise it is partial length
+        """
+        if length_type < 192:
+            return bytes.read(8).uint
+        
+        elif length_type < 224:
+            return bytes.read(8*2).uint
+        
+        elif length_type == 255:
+            # Ignore the first octet (255 just says to look at next 4)
+            bytes.read(8)
+            
+            # Add up the next octets
+            return bytes.read(8*4).uint
+        
+        else:
+            raise NotImplementedError("Don't know how to do partial packet length....")
 
 if __name__ == '__main__':
     key = RSA.importKey(open('../tests/data/gpg/key.asc').read())
