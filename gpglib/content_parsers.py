@@ -20,7 +20,7 @@ class ContentParser(object):
     def find_parsers(self):
         parsers = (
               (1, PubSessionKeyParser)
-            , (18, SymEncryptedIntegretyProtectedParser)
+            , (9, SymEncryptedParser)
             )
         
         for tag_type, kls in parsers:
@@ -71,7 +71,7 @@ class PubSessionKeyParser(Parser):
         info.public_session_key = bitstring.ConstBitStream(bytes=session_key).uint
         return info.public_session_key
         
-class SymEncryptedIntegretyProtectedParser(Parser):
-    """Parse public session key packet"""
+class SymEncryptedParser(Parser):
+    """Parse symmetrically encrypted data packet"""
     def consume(self, tag, info, bytes):
-        print bytes.read(60)
+        print bytes.read(tag.body_bit_length)
