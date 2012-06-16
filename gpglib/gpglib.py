@@ -22,9 +22,9 @@ class PacketParser(object):
         info = Info(keys, bytes)
         
         while True:
-            tag = self.next_tag(info)
-            if info.bytes.len == 0:
+            if info.bytes.pos == info.bytes.len:
                 break
+            tag = self.next_tag(info)
             self.content_parser.consume(tag, info)
         return info
     
