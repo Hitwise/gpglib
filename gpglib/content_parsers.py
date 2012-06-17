@@ -8,13 +8,12 @@ class ContentParser(object):
         self.parsers = {}
         self.parse_unknown = Parser()
         
-    def consume(self, tag, info, bytes):
+    def consume(self, tag, message, bytes):
         parser = self.parsers.get(tag.tag_type, self.parse_unknown)
-        bytes = info.bytes
         if tag.body_bit_length:
             # This packet has a defined length, let's only consume those bytes
             bytes = bytes.read(tag.body_bit_length * 8)
-        return parser.consume(tag, info, bytes)
+        return parser.consume(tag, message, bytes)
     
     def add_parser(self, key_id, parser):
         self.parsers[key_id] = parser
@@ -30,7 +29,7 @@ class ContentParser(object):
 
 class Parser(object):
     """Base Parser class"""
-    def consume(self, tag, info, bytes):
+    def consume(self, tag, message, bytes):
         raise NotImplementedError("Don't know about tag type %d" % tag.tag_type)
 
     def parse_mpi(self, bytes):
@@ -43,7 +42,7 @@ class Parser(object):
         
 class PubSessionKeyParser(Parser):
     """Parse public session key packet"""
-    def consume(self, tag, info, bytes):
+    def consume(self, tag, message, bytes):
         # Version of the packet we're parsing (almost always '3')
         version = bytes.read(8).uint
 
@@ -59,7 +58,7 @@ class PubSessionKeyParser(Parser):
 
         # Get the key which was used to encrypt the session key
         try:
-            key = info.keys[key_id]
+            key = message.keys[key_id]
         except KeyError:
             raise PGPException("Data was encrypted with RSA key '%d', which was't found" % key_id)
 
@@ -69,15 +68,15 @@ class PubSessionKeyParser(Parser):
         # Decrypt the session key
         session_key = key.decrypt(encrypted_session_key)
 
-        # Give session key to info
-        info.public_session_key = bitstring.ConstBitStream(bytes=session_key).bytes
-        return info.public_session_key
+        # Give session key to message
+        message.public_session_key = bitstring.ConstBitStream(bytes=session_key).bytes
+        return message.public_session_key
         
 class SymEncryptedParser(Parser):
     """Parse symmetrically encrypted data packet"""
-    def consume(self, tag, info, bytes):
+    def consume(self, tag, message, bytes):
         iv_len = 8*(CAST.block_size+2)
         ciphertext = bytes.read(bytes.len - iv_len).bytes
         iv = bytes.read(iv_len).bytes
         cipher = CAST.new('blahandstuff', CAST.MODE_OPENPGP, iv)
-        info.decrypted = cipher.decrypt(ciphertext)
+        message.decrypted = cipher.decrypt(ciphertext)

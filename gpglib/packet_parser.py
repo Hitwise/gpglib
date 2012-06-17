@@ -3,7 +3,7 @@ import bitstring
 
 from content_parsers import ContentParser
 from errors import PGPFormatException
-from structures import Tag, Info
+from structures import Tag
 
 class PacketParser(object):
     """
@@ -17,7 +17,7 @@ class PacketParser(object):
         This implementation calls the entire packet header a tag
         and will create a structures.Tag to represent it
         
-        consume will take in the info structure and the next region of bytes for consideration
+        consume will take in the Message structure and the next region of bytes for consideration
            For the first run, bytes should be the entire file
            For packets that contain other packets, bytes will be the bytes for just that packet
     """
@@ -26,7 +26,7 @@ class PacketParser(object):
         self.content_parser = ContentParser()
         self.content_parser.find_parsers()
     
-    def consume(self, info, bytes):
+    def consume(self, message, bytes):
         """
             Consume provided data
             Done by continually reading in packets untill none left
@@ -37,8 +37,8 @@ class PacketParser(object):
             if bytes.pos == bytes.len:
                 break
             tag = self.next_tag(bytes)
-            self.content_parser.consume(tag, info, bytes)
-        return info
+            self.content_parser.consume(tag, message, bytes)
+        return message
     
     def next_tag(self, bytes):
         """Determine the version, tag_type and body_bit_length of the next packet"""

@@ -3,9 +3,9 @@ from collections import namedtuple
 # Information obtained from an OpenPGP header
 Tag = namedtuple('Tag', ('version', 'tag_type', 'body_bit_length'))
 
-class Info(object):
+class Message(object):
     """
-        Class to hold:
+        Class to hold details about a message:
             * keys
             * Bytes of original data
             * Results form decrypt process
@@ -26,7 +26,7 @@ class Info(object):
         """
             Decrypt a message.
             Bytes can be specified to handle nested packets
-            Otherwise, defaults to the byte stream on the info object itself
+            Otherwise, defaults to the byte stream on the Message object itself
         """
         if bytes is None:
             bytes = self.bytes
