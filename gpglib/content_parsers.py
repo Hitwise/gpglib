@@ -1,5 +1,4 @@
 from Crypto.Cipher import CAST
-from Crypto import Random
 import bitstring
 
 class ContentParser(object):
@@ -8,49 +7,60 @@ class ContentParser(object):
         self.parsers = {}
         self.parse_unknown = Parser()
         
-    def consume(self, tag, message, bytes):
+    def consume(self, tag, message, region):
+        """
+            Find parser given tag.tag_type
+            And consume the provided region of data (limited to tag.body_bit_length)
+        """
+        # Determine what parser to use for this packet
+        # Default to self.parse_unknown, which will do some complaining for us
         parser = self.parsers.get(tag.tag_type, self.parse_unknown)
+        
+        # Limit bytes to consume if this packet has a defined length
         if tag.body_bit_length:
-            # This packet has a defined length, let's only consume those bytes
-            bytes = bytes.read(tag.body_bit_length * 8)
-        return parser.consume(tag, message, bytes)
-    
-    def add_parser(self, key_id, parser):
-        self.parsers[key_id] = parser
+            region = region.read(tag.body_bit_length * 8)
+        
+        # Consume the desired region
+        return parser.consume(tag, message, region)
     
     def find_parsers(self):
+        """
+            Add parsers to this instance of ContentParser
+            It's recommended that only one instance of this class is ever generated
+            So this setup only has to happen once
+        """
         parsers = (
               (1, PubSessionKeyParser)
             , (9, SymEncryptedParser)
             )
         
         for tag_type, kls in parsers:
-            self.add_parser(tag_type, kls())
+            self.parsers[tag_type] = kls()
 
 class Parser(object):
     """Base Parser class"""
-    def consume(self, tag, message, bytes):
+    def consume(self, tag, message, region):
         raise NotImplementedError("Don't know about tag type %d" % tag.tag_type)
 
-    def parse_mpi(self, bytes):
+    def parse_mpi(self, region):
         # Get the length of the MPI to read in
-        raw_mpi_length = bytes.read(2*8).uint
+        raw_mpi_length = region.read(2*8).uint
         mpi_length = (raw_mpi_length + 7) / 8
         
         # Read in the MPI bytes and return the resulting hex
-        return bytes.read(mpi_length).hex
-        
+        return region.read(mpi_length).hex
+
 class PubSessionKeyParser(Parser):
     """Parse public session key packet"""
-    def consume(self, tag, message, bytes):
+    def consume(self, tag, message, region):
         # Version of the packet we're parsing (almost always '3')
-        version = bytes.read(8).uint
+        version = region.read(8).uint
 
         # The id of the key used to encrypt the session key
-        key_id = bytes.read(8*8).uint
+        key_id = region.read(8*8).uint
 
         # The public key algorithm used to encrypt the session key
-        key_algo = bytes.read(8).uint
+        key_algo = region.read(8).uint
 
         if key_algo != 1:  # not RSA-encrypted session key
             # TODO: Implement Elgamal
@@ -63,7 +73,7 @@ class PubSessionKeyParser(Parser):
             raise PGPException("Data was encrypted with RSA key '%d', which was't found" % key_id)
 
         # Read the encrypted session key
-        encrypted_session_key = self.parse_mpi(bytes)
+        encrypted_session_key = self.parse_mpi(region)
         
         # Decrypt the session key
         session_key = key.decrypt(encrypted_session_key)
@@ -74,9 +84,9 @@ class PubSessionKeyParser(Parser):
         
 class SymEncryptedParser(Parser):
     """Parse symmetrically encrypted data packet"""
-    def consume(self, tag, message, bytes):
+    def consume(self, tag, message, region):
         iv_len = 8*(CAST.block_size+2)
-        ciphertext = bytes.read(bytes.len - iv_len).bytes
-        iv = bytes.read(iv_len).bytes
+        ciphertext = region.read(region.len - iv_len).bytes
+        iv = region.read(iv_len).bytes
         cipher = CAST.new('blahandstuff', CAST.MODE_OPENPGP, iv)
         message.decrypted = cipher.decrypt(ciphertext)

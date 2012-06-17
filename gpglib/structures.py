@@ -22,12 +22,12 @@ class Message(object):
             self._decryptor = PacketParser(self.keys)
         return self._decryptor
     
-    def decrypt(self, bytes=None):
+    def decrypt(self, region=None):
         """
             Decrypt a message.
             Bytes can be specified to handle nested packets
             Otherwise, defaults to the byte stream on the Message object itself
         """
-        if bytes is None:
-            bytes = self.bytes
-        self.decryptor.consume(self, bytes)
+        if region is None:
+            region = self.bytes
+        self.decryptor.consume(self, region)
