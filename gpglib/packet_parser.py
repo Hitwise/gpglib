@@ -69,10 +69,10 @@ class PacketParser(object):
         
         # We peek at the next byte to determine what type of length to get
         length_type = region.peek(8).uint
-        body_bit_length = self.determine_new_body_length(length_type, region)
+        body_length = self.determine_new_body_length(length_type, region)
         
         # Return the tag
-        return Tag(version=1, tag_type=tag_type, body_bit_length=body_bit_length)
+        return Tag(version=1, tag_type=tag_type, body_length=body_length)
         
     def parse_old_tag(self, tag, region):
         """
@@ -87,27 +87,17 @@ class PacketParser(object):
             raise NotImplementedError("PGP messages with a null length are not yet supported")
             
         # Determine the length of the packet body
-        body_bit_length = self.determine_old_body_length(length_type, region)
+        body_length = self.determine_old_body_length(length_type, region)
         
         # Return the tag
-        return Tag(version=0, tag_type=tag_type, body_bit_length=body_bit_length)
+        return Tag(version=0, tag_type=tag_type, body_length=body_length)
     
     def determine_old_body_length(self, length_type, region):
         """Determine body length of an old style packet"""
-        if length_type == 0:
-            # One Octet length
-            return region.read(8).uint
-        
-        elif length_type == 1:
-            # Two Octet length
-            return region.read(8*2).uint
-        
-        elif length_type == 2:
-            # Four Octet length
-            return region.read(8*4).uint
-        
-        else:
-            # Indeterminate length untill the end of the file
+        if length_type < 3:
+            octet_length = 2**length_type
+            return region.read(8*octet_length).uint
+        else:  # indeterminate length untill the end of the file
             return None
     
     def determine_new_body_length(self, length_type, region):
@@ -122,7 +112,8 @@ class PacketParser(object):
             return region.read(8).uint
         
         elif length_type < 224:
-            return region.read(8*2).uint
+            # TODO: Make this nicer
+            return ((region.read(8).uint - 192) << 8) + (region.read(8).uint + 192)
         
         elif length_type == 255:
             # Ignore the first octet (255 just says to look at next 4)

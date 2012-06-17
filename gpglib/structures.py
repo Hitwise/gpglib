@@ -1,7 +1,7 @@
 from collections import namedtuple
 
 # Information obtained from an OpenPGP header
-Tag = namedtuple('Tag', ('version', 'tag_type', 'body_bit_length'))
+Tag = namedtuple('Tag', ('version', 'tag_type', 'body_length'))
 
 class Message(object):
     """

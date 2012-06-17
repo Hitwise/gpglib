@@ -17,8 +17,8 @@ class ContentParser(object):
         parser = self.parsers.get(tag.tag_type, self.parse_unknown)
         
         # Limit bytes to consume if this packet has a defined length
-        if tag.body_bit_length:
-            region = region.read(tag.body_bit_length * 8)
+        if tag.body_length:
+            region = region.read(tag.body_length*8)
         
         # Consume the desired region
         return parser.consume(tag, message, region)
@@ -44,11 +44,10 @@ class Parser(object):
 
     def parse_mpi(self, region):
         # Get the length of the MPI to read in
-        raw_mpi_length = region.read(2*8).uint
-        mpi_length = (raw_mpi_length + 7) / 8
+        mpi_length = region.read(2*8).uint
         
-        # Read in the MPI bytes and return the resulting hex
-        return region.read(mpi_length).hex
+        # Read in the MPI bytes and return the resulting bitstream
+        return region.read(mpi_length)
 
 class PubSessionKeyParser(Parser):
     """Parse public session key packet"""
@@ -73,18 +72,19 @@ class PubSessionKeyParser(Parser):
             raise PGPException("Data was encrypted with RSA key '%d', which was't found" % key_id)
 
         # Read the encrypted session key
-        encrypted_session_key = self.parse_mpi(region)
+        encrypted_session_key = self.parse_mpi(region).bytes
         
         # Decrypt the session key
         session_key = key.decrypt(encrypted_session_key)
 
-        # Give session key to message
-        message.public_session_key = bitstring.ConstBitStream(bytes=session_key).bytes
-        return message.public_session_key
+        # Return the session key
+        return {
+            'session_key': session_key,
+        }
         
 class SymEncryptedParser(Parser):
     """Parse symmetrically encrypted data packet"""
-    def consume(self, tag, message, region):
+    def consume(self, tag, message, region, session_key):
         iv_len = 8*(CAST.block_size+2)
         ciphertext = region.read(region.len - iv_len).bytes
         iv = region.read(iv_len).bytes
