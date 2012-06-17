@@ -1,3 +1,5 @@
+from Crypto.Cipher import CAST
+from Crypto import Random
 import bitstring
 
 class ContentParser(object):
@@ -6,12 +8,12 @@ class ContentParser(object):
         self.parsers = {}
         self.parse_unknown = Parser()
         
-    def consume(self, tag, info):
+    def consume(self, tag, info, bytes):
         parser = self.parsers.get(tag.tag_type, self.parse_unknown)
         bytes = info.bytes
         if tag.body_bit_length:
             # This packet has a defined length, let's only consume those bytes
-            bytes = info.bytes.read(tag.body_bit_length * 8)
+            bytes = bytes.read(tag.body_bit_length * 8)
         return parser.consume(tag, info, bytes)
     
     def add_parser(self, key_id, parser):
@@ -68,10 +70,14 @@ class PubSessionKeyParser(Parser):
         session_key = key.decrypt(encrypted_session_key)
 
         # Give session key to info
-        info.public_session_key = bitstring.ConstBitStream(bytes=session_key).uint
+        info.public_session_key = bitstring.ConstBitStream(bytes=session_key).bytes
         return info.public_session_key
         
 class SymEncryptedParser(Parser):
     """Parse symmetrically encrypted data packet"""
     def consume(self, tag, info, bytes):
-        print bytes.read(tag.body_bit_length)
+        iv_len = 8*(CAST.block_size+2)
+        ciphertext = bytes.read(bytes.len - iv_len).bytes
+        iv = bytes.read(iv_len).bytes
+        cipher = CAST.new('blahandstuff', CAST.MODE_OPENPGP, iv)
+        info.decrypted = cipher.decrypt(ciphertext)
