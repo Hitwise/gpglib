@@ -12,4 +12,5 @@ if __name__ == '__main__':
     message = Message(keys, data)
     message.decrypt()
 
-    print message.data
+    print "Message successfully decrypted::"
+    print message.plaintext

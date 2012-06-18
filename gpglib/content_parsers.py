@@ -181,4 +181,4 @@ class SymEncryptedParser(Parser):
 class LiteralParser(object):
     """No-op parser that sets the given data onto `message`"""
     def consume(self, tag, message, region):
-        message.data = region.bytes
+        message.add_plaintext(region.bytes)
