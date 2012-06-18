@@ -8,7 +8,8 @@ if __name__ == '__main__':
     keys = {5524596192824459786: key}
     
     data = open('../tests/data/data.dump.gpg').read()
-    bytes = bitstring.ConstBitStream(bytes=data)
     
-    message = Message(keys, bytes)
+    message = Message(keys, data)
     message.decrypt()
+
+    print message.data
