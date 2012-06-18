@@ -1,3 +1,5 @@
+import zlib
+
 import bitstring
 from Crypto import Random
 from Crypto.Cipher import CAST, PKCS1_v1_5
@@ -35,6 +37,7 @@ class ContentParser(object):
         """
         parsers = (
               (1, PubSessionKeyParser)
+            , (8, CompressedParser)
             , (9, SymEncryptedParser)
             )
         
@@ -115,7 +118,24 @@ class PubSessionKeyParser(Parser):
             'algo': algo,
             'session_key': session_key,
         }
-        
+
+class CompressedParser(object):
+    """Parse compressed packets"""
+    def consume(self, tag, message, region):
+        # Get the compression algorithm used
+        algo = region.read(8).uint
+
+        if algo != 1:  # we only support ZIP compression for now
+            raise NotImplementedError("Compression type '%d' not supported" % algo)
+
+        # Use zlib to decompress the packet. The -13 at the end is the window size.
+        # It says to ignore the zlib header (because it's negative) and that the
+        # data is compressed with 13 bits of compression.
+        uncompressed = zlib.decompress(region.read('bytes'), -13)
+
+        # Parse the inner packet and return it
+        return message.decrypt(bitstring.ConstBitStream(bytes=uncompressed))
+
 class SymEncryptedParser(Parser):
     """Parse symmetrically encrypted data packet"""
     # Mapping of PGP encryption algorithm types to a PyCrypto module which implements
@@ -146,5 +166,8 @@ class SymEncryptedParser(Parser):
         # Build the cipher object from the session key and the IV
         decryptor = cipher.new(session_key, cipher.MODE_OPENPGP, iv)
 
-        # Decrypt the ciphertext and set it on the class
-        message.decrypted = decryptor.decrypt(ciphertext)
+        # Decrypt the ciphertext
+        decrypted = decryptor.decrypt(ciphertext)
+
+        # Parse the inner packet and return it
+        return message.decrypt(bitstring.ConstBitStream(bytes=decrypted))

@@ -86,11 +86,11 @@ class PacketParser(object):
         tag_type = tag.read(4).uint
         length_type = tag.read(2).uint
         
-        if length_type == 3:
-            raise NotImplementedError("PGP messages with a null length are not yet supported")
-            
-        # Determine the length of the packet body
-        body_length = self.determine_old_body_length(length_type, region)
+        if length_type == 3:  # indeterminate length untill the end of the file
+            body_length = None
+        else:
+            # Determine the length of the packet body
+            body_length = self.determine_old_body_length(length_type, region)
         
         # Return the tag
         return Tag(version=0, tag_type=tag_type, body_length=body_length)
