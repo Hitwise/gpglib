@@ -52,10 +52,11 @@ class Parser(object):
 
     def parse_mpi(self, region):
         # Get the length of the MPI to read in
-        mpi_length = region.read(2*8).uint
+        raw_mpi_length = region.read(2*8).uint
         
         # Read in the MPI bytes and return the resulting bitstream
-        return region.read(mpi_length)
+        mpi_length = (raw_mpi_length + 7) / 8
+        return region.read(mpi_length*8)
 
 class PubSessionKeyParser(Parser):
     """Parse public session key packet"""
@@ -91,6 +92,12 @@ class PubSessionKeyParser(Parser):
         # Generate the sentinel value (19 is the exact length of a valid decrypted
         # passphrase)
         sentinel = Random.new().read(19)
+
+        # The size of the key in bytes
+        key_size = (key.size() + 1) / 8
+
+        # Pad the key with zero's to the left until it's `key_size` bytes long
+        encrypted_session_key = encrypted_session_key.rjust(key_size, '\xff')
 
         # Decrypt and decode the session key
         decrypted = pkcs.decrypt(encrypted_session_key, sentinel)
@@ -131,8 +138,8 @@ class CompressedParser(object):
 
         # Use zlib to decompress the packet. The -13 at the end is the window size.
         # It says to ignore the zlib header (because it's negative) and that the
-        # data is compressed with 13 bits of compression.
-        uncompressed = zlib.decompress(region.read('bytes'), -13)
+        # data is compressed with up to 15 bits of compression.
+        uncompressed = zlib.decompress(region.read('bytes'), -15)
 
         # Parse the inner packet and return it
         return message.decrypt(bitstring.ConstBitStream(bytes=uncompressed))
