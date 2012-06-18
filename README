@@ -38,4 +38,4 @@ Note that the pw stuff is because openpgp2ssh will otherwise complain with "we c
 
 I then created data.dump as one of the examples on http://json.org/example.html and did the following to make data.dump.gpg::
     
-    $ gpg -o data.dump.gpg --cipher-algo CAST5 --compress-algo ZLIB --yes --disable-mdc --homedir ./gpg  -r Stephen --encrypt data.dump
+    $ gpg -o data.dump.gpg --cipher-algo CAST5 --compress-algo ZIP --yes --disable-mdc --homedir ./gpg  -r Stephen --encrypt data.dump
