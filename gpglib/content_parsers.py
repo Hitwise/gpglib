@@ -138,7 +138,7 @@ class CompressedParser(object):
         uncompressed = zlib.decompress(region.read('bytes'), -15)
 
         # Parse the inner packet and return it
-        return message.decrypt(uncompressed)
+        return message.consume(uncompressed)
 
 class SymEncryptedParser(Parser):
     """Parse symmetrically encrypted data packet"""
@@ -173,7 +173,7 @@ class SymEncryptedParser(Parser):
         decrypted = decryptor.decrypt(ciphertext)
 
         # Parse the inner packet and return it
-        return message.decrypt(decrypted)
+        return message.consume(decrypted)
 
 class LiteralParser(object):
     """No-op parser that sets the given data onto `message`"""
