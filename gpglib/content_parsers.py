@@ -75,9 +75,8 @@ class PubSessionKeyParser(Parser):
             raise NotImplementedError("Session keys encrypted with public key type '%d' not implemented" % key_algo)
 
         # Get the key which was used to encrypt the session key
-        try:
-            key = message.keys[key_id]
-        except KeyError:
+        key = message.keys.get(key_id)
+        if not key:
             raise PGPException("Data was encrypted with RSA key '%d', which was't found" % key_id)
 
         # Read the encrypted session key
@@ -154,9 +153,8 @@ class SymEncryptedParser(Parser):
 
     def consume(self, tag, message, region, algo, session_key):
         # Get the encryption algorithm used
-        try:
-            cipher = self.ENCRYPTION_ALGORITHMS[algo]
-        except KeyError:
+        cipher = self.ENCRYPTION_ALGORITHMS.get(algo)
+        if not cipher:
             raise NotImplementedError("Symmetric encryption type '%d' hasn't been implemented" % algo)
 
         # Handy alias for the encryption algo's block size
