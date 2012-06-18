@@ -178,4 +178,18 @@ class SymEncryptedParser(Parser):
 class LiteralParser(object):
     """No-op parser that sets the given data onto `message`"""
     def consume(self, tag, message, region):
-        message.add_plaintext(region.bytes)
+        # Is it binary ('b'), text ('t') or utf-8 text ('u')
+        format = region.read(8).bytes
+
+        # The length of the filename in bytes
+        filename_length = region.read(8).uint
+
+        # Read in the filename
+        if filename_length:
+            filename = region.read(filename_length*8).bytes
+
+        # Read in the date (can mean anything. ie. creation, modification, or 0)
+        date = region.read(8*4).uint
+
+        # Add the literal data to the list of decrypted plaintext
+        message.add_plaintext(region.read('bytes'))
