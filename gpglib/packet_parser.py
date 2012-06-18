@@ -36,9 +36,7 @@ class PacketParser(object):
             Use content_parser to actually parse the packet
         """
         kwargs = {}
-        while True:
-            if region.pos == region.len:
-                break
+        while region.pos != region.len:
             tag = self.next_tag(region)
 
             # Pass the results from the previous parser call to the next one
@@ -58,32 +56,34 @@ class PacketParser(object):
         # How the tag is parsed changes between the two versions
         version = tag.read(1).uint
         if version == 1:
-            return self.parse_new_tag(tag, region)
+            # Read the tag type as the next 6 bits
+            tag_type = tag.read(6).uint
+
+            return self.parse_new_tag(tag_type, region)
         else:
             return self.parse_old_tag(tag, region)
     
-    def parse_new_tag(self, tag, region):
+    def parse_new_tag(self, tag_type, region):
         """
-            6 bits left to parse in the tag
-            All 6 bits become the content type
             The length of the packet is then determined by the next group of bytes
         """
-        tag_type = tag.read(6).uint
-        
         # We peek at the next byte to determine what type of length to get
         length_type = region.peek(8).uint
         body_length = self.determine_new_body_length(length_type, region)
 
         # Determine the body of the packet
-        if body_length:
+        if body_length is not None:
             body = region.read(body_length*8)
         else:
-            # Found a partial packet
-            # Add up all the partials to get the entire body
-            body_len = 1 << (length_type & 0x1F)
+            # Found a partial packet. Add up all the partials to get the entire body
+            body_len = 1 << (length_type & 0b11111)
+
+            # Read the specified length of bytes from the body
             body = region.read(body_len*8)
-            body += self.next_tag(region).body
-        
+
+            # See recursion
+            body += self.parse_new_tag(tag_type, region).body
+
         # Return the tag
         return Tag(version=1, tag_type=tag_type, body=body)
         
@@ -103,9 +103,10 @@ class PacketParser(object):
             body_length = self.determine_old_body_length(length_type, region)
         
         # Get body of the packet
-        body = region
         if body_length is not None:
             body = region.read(body_length * 8)
+        else:
+            body = region.read(region.len - region.pos)
 
         # Return the tag
         return Tag(version=0, tag_type=tag_type, body=body)
@@ -142,5 +143,8 @@ class PacketParser(object):
             return region.read(8*4).uint
         
         else:
-            # Partial packet
+            # Length_type hasn't been read yet, just peeked
+            region.read(8)
+
+            # Return None to specify a partial packet
             return None
