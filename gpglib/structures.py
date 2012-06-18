@@ -17,7 +17,7 @@ class Message(object):
     @property
     def decryptor(self):
         """Memoized PacketParser"""
-        if not hasattr(self, 'decryptor'):
+        if not hasattr(self, '_decryptor'):
             from packet_parser import PacketParser
             self._decryptor = PacketParser(self.keys)
         return self._decryptor
