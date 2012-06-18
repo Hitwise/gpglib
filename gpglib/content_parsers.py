@@ -39,6 +39,7 @@ class ContentParser(object):
               (1, PubSessionKeyParser)
             , (8, CompressedParser)
             , (9, SymEncryptedParser)
+            , (11, LiteralParser)
             )
         
         for tag_type, kls in parsers:
@@ -171,3 +172,8 @@ class SymEncryptedParser(Parser):
 
         # Parse the inner packet and return it
         return message.decrypt(bitstring.ConstBitStream(bytes=decrypted))
+
+class LiteralParser(object):
+    """No-op parser that sets the given data onto `message`"""
+    def consume(self, tag, message, region):
+        message.data = region.bytes
