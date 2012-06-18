@@ -74,7 +74,7 @@ class PubSessionKeyParser(Parser):
         # Get the key which was used to encrypt the session key
         key = message.keys.get(key_id)
         if not key:
-            raise PGPException("Data was encrypted with RSA key '%d', which was't found" % key_id)
+            raise errors.PGPException("Data was encrypted with RSA key '%d', which was't found" % key_id)
 
         # Read the encrypted session key
         encrypted_session_key = self.parse_mpi(region).bytes
