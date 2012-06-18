@@ -8,9 +8,15 @@ if __name__ == '__main__':
     keys = {5524596192824459786: key}
     
     data = open('../tests/data/data.dump.gpg').read()
-    
     message = Message(keys, data)
     message.decrypt()
 
-    print "Message successfully decrypted::"
+    print "Message successfully decrypted data.dump::"
+    print message.plaintext
+
+    data = open('../tests/data/data.big.dump.gpg').read()
+    message = Message(keys, data)
+    message.decrypt()
+
+    print "Message successfully decrypted data.big.dump::"
     print message.plaintext

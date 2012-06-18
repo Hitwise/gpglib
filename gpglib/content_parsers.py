@@ -13,21 +13,17 @@ class ContentParser(object):
         self.parsers = {}
         self.parse_unknown = Parser()
         
-    def consume(self, tag, message, region, kwargs):
+    def consume(self, tag, message, kwargs):
         """
             Find parser given tag.tag_type
-            And consume the provided region of data (limited to tag.body_bit_length)
+            And consume the body of the tag using correct packet parser
         """
         # Determine what parser to use for this packet
         # Default to self.parse_unknown, which will do some complaining for us
         parser = self.parsers.get(tag.tag_type, self.parse_unknown)
         
-        # Limit bytes to consume if this packet has a defined length
-        if tag.body_length:
-            region = region.read(tag.body_length*8)
-        
         # Consume the desired region
-        return parser.consume(tag, message, region, **kwargs)
+        return parser.consume(tag, message, tag.body, **kwargs)
     
     def find_parsers(self):
         """

@@ -41,8 +41,8 @@ class PacketParser(object):
                 break
             tag = self.next_tag(region)
 
-            # Pass the results from the previous parser call to the next ont
-            kwargs = self.content_parser.consume(tag, message, region, kwargs) or {}
+            # Pass the results from the previous parser call to the next one
+            kwargs = self.content_parser.consume(tag, message, kwargs) or {}
         return message
     
     def next_tag(self, region):
@@ -73,9 +73,19 @@ class PacketParser(object):
         # We peek at the next byte to determine what type of length to get
         length_type = region.peek(8).uint
         body_length = self.determine_new_body_length(length_type, region)
+
+        # Determine the body of the packet
+        if body_length:
+            body = region.read(body_length*8)
+        else:
+            # Found a partial packet
+            # Add up all the partials to get the entire body
+            body_len = 1 << (length_type & 0x1F)
+            body = region.read(body_len*8)
+            body += self.next_tag(region).body
         
         # Return the tag
-        return Tag(version=1, tag_type=tag_type, body_length=body_length)
+        return Tag(version=1, tag_type=tag_type, body=body)
         
     def parse_old_tag(self, tag, region):
         """
@@ -92,8 +102,13 @@ class PacketParser(object):
             # Determine the length of the packet body
             body_length = self.determine_old_body_length(length_type, region)
         
+        # Get body of the packet
+        body = region
+        if body_length is not None:
+            body = region.read(body_length * 8)
+
         # Return the tag
-        return Tag(version=0, tag_type=tag_type, body_length=body_length)
+        return Tag(version=0, tag_type=tag_type, body=body)
     
     def determine_old_body_length(self, length_type, region):
         """Determine body length of an old style packet"""
@@ -127,4 +142,5 @@ class PacketParser(object):
             return region.read(8*4).uint
         
         else:
-            raise NotImplementedError("Don't know how to do partial packet length....")
+            # Partial packet
+            return None

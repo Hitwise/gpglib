@@ -2,7 +2,7 @@ from collections import namedtuple
 import bitstring
 
 # Information obtained from an OpenPGP header
-Tag = namedtuple('Tag', ('version', 'tag_type', 'body_length'))
+Tag = namedtuple('Tag', ('version', 'tag_type', 'body'))
 
 class Message(object):
     """
