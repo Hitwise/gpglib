@@ -39,3 +39,18 @@ Note that the pw stuff is because openpgp2ssh will otherwise complain with "we c
 I then created data.dump as one of the examples on http://json.org/example.html and did the following to make data.dump.gpg::
     
     $ gpg -o data.dump.gpg --cipher-algo CAST5 --compress-algo ZIP --yes --disable-mdc --homedir ./gpg  -r Stephen --encrypt data.dump
+
+Tests
+=====
+
+$ pip install -r test_requirements.txt
+
+Install nosy if you want the ability to make tests autorun when you run the tests (https://bitbucket.org/delfick/nosy)
+
+And then run
+$ ./test.sh
+
+Or if you have nosy
+$ nosy ./test.sh
+
+Currently not much is tested

@@ -1,5 +1,4 @@
 from Crypto.PublicKey import RSA
-import bitstring
 
 from structures import Message
 
