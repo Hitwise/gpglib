@@ -7,7 +7,7 @@ class ContentParser(object):
         self.parsers = {}
         self.parse_unknown = Parser()
         
-    def consume(self, tag, message, region):
+    def consume(self, tag, message, region, kwargs):
         """
             Find parser given tag.tag_type
             And consume the provided region of data (limited to tag.body_bit_length)
@@ -21,7 +21,7 @@ class ContentParser(object):
             region = region.read(tag.body_length*8)
         
         # Consume the desired region
-        return parser.consume(tag, message, region)
+        return parser.consume(tag, message, region, **kwargs)
     
     def find_parsers(self):
         """
@@ -77,7 +77,7 @@ class PubSessionKeyParser(Parser):
         # Decrypt the session key
         session_key = key.decrypt(encrypted_session_key)
 
-        # Return the session key
+        # Pass the session key on to the next parser
         return {
             'session_key': session_key,
         }
@@ -86,7 +86,7 @@ class SymEncryptedParser(Parser):
     """Parse symmetrically encrypted data packet"""
     def consume(self, tag, message, region, session_key):
         iv_len = 8*(CAST.block_size+2)
-        ciphertext = region.read(region.len - iv_len).bytes
         iv = region.read(iv_len).bytes
-        cipher = CAST.new('blahandstuff', CAST.MODE_OPENPGP, iv)
+        ciphertext = region.read(region.len - iv_len).bytes
+        cipher = CAST.new(session_key, CAST.MODE_OPENPGP, iv)
         message.decrypted = cipher.decrypt(ciphertext)

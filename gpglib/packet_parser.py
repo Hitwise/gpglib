@@ -35,11 +35,14 @@ class PacketParser(object):
             Use next_tag to determine information about each packet
             Use content_parser to actually parse the packet
         """
+        kwargs = {}
         while True:
             if region.pos == region.len:
                 break
             tag = self.next_tag(region)
-            self.content_parser.consume(tag, message, region)
+
+            # Pass the results from the previous parser call to the next ont
+            kwargs = self.content_parser.consume(tag, message, region, kwargs) or {}
         return message
     
     def next_tag(self, region):
