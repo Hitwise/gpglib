@@ -44,7 +44,7 @@ class Message(object):
         if region is None:
             region = self.bytes
 
-        if type(region) in (str, unicode):
+        if isinstance(region, (str, unicode)):
             region = bitstring.ConstBitStream(bytes=region)
 
         self.decryptor.consume(self, region)
