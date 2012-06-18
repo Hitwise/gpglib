@@ -100,7 +100,8 @@ class PacketParser(object):
         if length_type < 3:
             octet_length = 2**length_type
             return region.read(8*octet_length).uint
-        else:  # indeterminate length untill the end of the file
+        else:
+            # indeterminate length untill the end of the file
             return None
     
     def determine_new_body_length(self, length_type, region):

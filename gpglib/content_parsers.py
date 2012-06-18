@@ -70,7 +70,8 @@ class PubSessionKeyParser(Parser):
         # The public key algorithm used to encrypt the session key
         key_algo = region.read(8).uint
 
-        if key_algo != 1:  # not RSA-encrypted session key
+        if key_algo != 1:
+            # not RSA-encrypted session key
             # TODO: Implement Elgamal
             raise NotImplementedError("Session keys encrypted with public key type '%d' not implemented" % key_algo)
 
