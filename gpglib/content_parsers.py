@@ -97,7 +97,7 @@ class PubSessionKeyParser(Parser):
         key_size = (key.size() + 1) / 8
 
         # Pad the key with zero's to the left until it's `key_size` bytes long
-        encrypted_session_key = encrypted_session_key.rjust(key_size, '\xff')
+        encrypted_session_key = encrypted_session_key.rjust(key_size, '\0')
 
         # Decrypt and decode the session key
         decrypted = pkcs.decrypt(encrypted_session_key, sentinel)
