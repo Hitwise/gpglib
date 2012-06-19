@@ -220,9 +220,9 @@ class SecretKeyParser(Parser):
         # Now for the secret portion of the key
         return None
 
-class SecretSubKeyParser(Parser):
-    def consume(self, tag, message, region):
-        return None
+class SecretSubKeyParser(SecretKeyParser):
+    """Same format as Secret Key"""
+    pass
 
 class CompressedParser(Parser):
     """Parse compressed packets"""
