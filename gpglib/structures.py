@@ -117,8 +117,9 @@ class EncryptedMessage(PGPMessage):
 ####################
 
 class Key(PGPMessage):
-    def __init__(self):
+    def __init__(self, passphrase=None):
         super(Key, self).__init__()
+        self.passphrase = passphrase
         self.public_keys = ValueTracker()
         self.secret_keys = ValueTracker()
     
