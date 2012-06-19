@@ -49,11 +49,13 @@ class PacketContentParser(ContentParser):
               (1, PubSessionKeyParser)
             , (2, SignatureParser)
             , (5, SecretKeyParser)
+            , (6, PublicKeyParser)
             , (7, SecretSubKeyParser)
             , (8, CompressedParser)
             , (9, SymEncryptedParser)
             , (11, LiteralParser)
             , (13, UserIdParser)
+            , (14, PublicSubKeyParser)
             )
 
 class SubSignatureContentParser(ContentParser):
@@ -195,7 +197,7 @@ class SignatureParser(Parser):
 
         return None
 
-class SecretKeyParser(Parser):
+class PublicKeyParser(Parser):
     def consume(self, tag, message, region):
         # TODO: Refactor out the public-key portion of this function when we need
         # to parse public key packets
@@ -217,11 +219,18 @@ class SecretKeyParser(Parser):
         # Get the exponent of the RSA public key (encoded as an MPI)
         rsa_e = self.parse_mpi(region).uint
 
-        # Now for the secret portion of the key
-        return None
+class SecretKeyParser(PublicKeyParser):
+    def consume(self, tag, message, region):
+        public_info = super(SecretKeyParser, self).consume(tag, message, region)
+        
+        # Parse secret key stuff here
 
 class SecretSubKeyParser(SecretKeyParser):
     """Same format as Secret Key"""
+    pass
+
+class PublicSubKeyParser(PublicKeyParser):
+    """Same format as Public Key"""
     pass
 
 class CompressedParser(Parser):
