@@ -33,7 +33,9 @@ class ContentParser(object):
         """
         parsers = (
               (1, PubSessionKeyParser)
+            , (2, SignatureParser)
             , (5, SecretKeyParser)
+            , (7, SecretSubKeyParser)
             , (8, CompressedParser)
             , (9, SymEncryptedParser)
             , (11, LiteralParser)
@@ -47,6 +49,14 @@ class Parser(object):
     """Base Parser class"""
     def consume(self, tag, message, region):
         raise NotImplementedError("Don't know about tag type %d" % tag.tag_type)
+
+    def only_implemented(self, received, implemented, message):
+        if received not in implemented:
+            raise NotImplementedError("%s |:| Sorry, haven't implemented value %d. Have only implemented %s." % (self.name, received, message))
+
+    @property
+    def name(self):
+        return self.__class__.__name__
 
     def parse_mpi(self, region):
         # Get the length of the MPI to read in
@@ -66,12 +76,9 @@ class PubSessionKeyParser(Parser):
         key_id = region.read(8*8).uint
 
         # The public key algorithm used to encrypt the session key
+        # TODO: Implement Elgamal
         key_algo = region.read(8).uint
-
-        if key_algo != 1:
-            # not RSA-encrypted session key
-            # TODO: Implement Elgamal
-            raise NotImplementedError("Session keys encrypted with public key type '%d' not implemented" % key_algo)
+        self.only_implemented(key_algo, (1, ), "session keys implemented with rsa")
 
         # Get the key which was used to encrypt the session key
         key = message.keys.get(key_id)
@@ -125,6 +132,38 @@ class PubSessionKeyParser(Parser):
             'session_key': session_key,
         }
 
+class SignatureParser(Parser):
+    """Signature packets describes a binding between some public key and some data"""
+    def consume(self, tag, message, region):
+        version = region.read(8).uint
+        self.only_implemented(version, (4, ), "version four signature packets")
+
+        signature_type = region.read(8).uint
+
+        public_key_algorithm = region.read(8).uint
+        self.only_implemented(public_key_algorithm, (1, ), "RSA Encrypt or sign public keys")
+
+        hash_algorithm = region.read(8).uint
+        self.only_implemented(hash_algorithm, (2, ), "SHA-1 hashing")
+
+        # Determine hashed data
+        hashed_subpacket_length = region.read(8*2).uint
+        hashed_subpacket_data = region.read(hashed_subpacket_length * 8)
+
+        # Not cyrptographically protected by signature
+        # Should only contain advisory information
+        unhashed_subpacket_length = region.read(8*2).uint
+        unhashed_subpacket_data = region.read(unhashed_subpacket_length * 8)
+
+        # Left 16 bits of the signed hash value provided for a heuristic test for valid signatures
+        left_of_signed_hash = region.read(8*2)
+
+        # Get the mpi value for the RSA hash
+        # RSA signature value m**d mod n
+        mdn = self.parse_mpi(region).uint
+
+        return None
+
 class SecretKeyParser(Parser):
     def consume(self, tag, message, region):
         # TODO: Refactor out the public-key portion of this function when we need
@@ -132,19 +171,14 @@ class SecretKeyParser(Parser):
 
         # Get the version of the public key
         public_key_version = region.read(8).uint
-
-        # Only version 4 packets are supported
-        if public_key_version != 4:
-            raise NotImplementedError("Public key versions != 4 are not supported. Upgrade your PGP!")
+        self.only_implemented(public_key_version, (4, ), "version 4 secret keys. Upgrade your PGP!")
 
         # The creation time of the secret key
         ctime = region.read(8*4).uint
 
         # Get the public key algorithm used by this key
         algo = region.read(8).uint
-
-        if algo != 1:  # only RSA is supported
-            raise NotImplementedError("Public key algorithm '%d' not supported" % algo)
+        self.only_implemented(algo, (1, ), "RSA encrypted public keys")
 
         # Get the `n` value of the RSA public key (encoded as an MPI)
         rsa_n = self.parse_mpi(region).uint
@@ -153,16 +187,18 @@ class SecretKeyParser(Parser):
         rsa_e = self.parse_mpi(region).uint
 
         # Now for the secret portion of the key
-        print rsa_e
+        return None
+
+class SecretSubKeyParser(Parser):
+    def consume(self, tag, message, region):
+        return None
 
 class CompressedParser(Parser):
     """Parse compressed packets"""
     def consume(self, tag, message, region):
         # Get the compression algorithm used
         algo = region.read(8).uint
-
-        if algo != 1:  # we only support ZIP compression for now
-            raise NotImplementedError("Compression type '%d' not supported" % algo)
+        self.only_implemented(algo, (1, ), "ZIP compression")
 
         # Use zlib to decompress the packet. The -15 at the end is the window size.
         # It says to ignore the zlib header (because it's negative) and that the
