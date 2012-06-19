@@ -1,11 +1,61 @@
 from Crypto.PublicKey import RSA
 import bitstring
 
-from content_parsers import ContentParser
+from content_parsers import PacketContentParser, SubSignatureContentParser
 from errors import PGPFormatException
 from structures import Tag
 
-class PacketParser(object):
+####################
+### PARSER BASE
+####################
+
+class Parser(object):
+    """Base for PacketContentParser and SubSignatureParser"""
+    content_parser_kls = None
+
+    def __init__(self):
+        self.content_parser = self.make_content_parser()
+
+    def make_content_parser(self):
+        """Used by subclasses to determine content parser"""
+        parser = self.content_parser_kls()
+        parser.find_parsers()
+        return parser
+
+    def start_tag(self, tag, message):
+        """Called when a tag is started"""
+        pass
+
+    def end_tag(self, tag, message):
+        """Called when a tag is ended"""
+        pass
+
+    def next_tag(self, region):
+        """Called to get the next tag from the region"""
+        raise NotImplemented
+
+    def consume(self, message, region):
+        """
+            Consume provided region of data
+            Done by continually reading in packets untill none left
+            Use next_tag to determine information about each packet
+            Use content_parser to actually parse the packet
+        """
+        kwargs = {}
+        while region.pos != region.len:
+            tag = self.next_tag(region)
+
+            # Pass the results from the previous parser call to the next one
+            self.start_tag(tag, message)
+            kwargs = self.content_parser.consume(tag, message, kwargs) or {}
+            self.end_tag(tag, message)
+        return message
+
+####################
+### NORMAL PACKETS
+####################
+
+class PacketParser(Parser):
     """
         RFC 4880 Section 4 says that a message is made up of many packets.
         Where a packet consists of a packet header followed by the packet body.
@@ -23,25 +73,15 @@ class PacketParser(object):
        
        message.bytes will always be the bytes for the entire message
     """
-    def __init__(self, keys):
-        # Content parser is stateless
-        self.content_parser = ContentParser()
-        self.content_parser.find_parsers()
-    
-    def consume(self, message, region):
-        """
-            Consume provided region of data
-            Done by continually reading in packets untill none left
-            Use next_tag to determine information about each packet
-            Use content_parser to actually parse the packet
-        """
-        kwargs = {}
-        while region.pos != region.len:
-            tag = self.next_tag(region)
+    content_parser_kls = PacketContentParser
 
-            # Pass the results from the previous parser call to the next one
-            kwargs = self.content_parser.consume(tag, message, kwargs) or {}
-        return message
+    def start_tag(self, tag, message):
+        """Called when a tag is started"""
+        message.start_tag(tag)
+
+    def end_tag(self, tag, message):
+        """Called when a tag is ended"""
+        message.end_tag()
     
     def next_tag(self, region):
         """Determine the version, tag_type and body_bit_length of the next packet"""
@@ -148,3 +188,40 @@ class PacketParser(object):
 
             # Return None to specify a partial packet
             return None
+
+####################
+### SUB SIGNATURE PACKETS
+####################
+
+class SubSignatureParser(Parser):
+    """SubSignaturePackets are a bit different to normal packets"""
+    content_parser_kls = SubSignatureContentParser
+
+    def next_tag(self, region):
+        """Called to get the next tag from the region"""
+        # First few octets says the length of the subpacket
+        body_length = self.determine_body_length(region)
+
+        # After length is the tag type and then the body of the message
+        body = region.read(body_length*8)
+        tag_type = body.read(8).uint
+
+        return Tag(version=None, tag_type=tag_type, body=body)
+
+    def determine_body_length(self, region):
+        """RFC 4880 5.2.3.1"""
+        length_type = region.peek(8).uint
+
+        if length_type < 192:
+            return region.read(8).uint
+        
+        elif length_type < 255:
+            # TODO: Make this nicer
+            return ((region.read(8).uint - 192) << 8) + (region.read(8).uint + 192)
+        
+        elif length_type == 255:
+            # Ignore the first octet (255 just says to look at next 4)
+            region.read(8)
+            
+            # Add up the next four octets
+            return region.read(8*4).uint

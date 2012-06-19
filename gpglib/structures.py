@@ -1,6 +1,8 @@
 from collections import namedtuple
 import bitstring
 
+from utils import ValueTracker
+
 # Information obtained from an OpenPGP header
 Tag = namedtuple('Tag', ('version', 'tag_type', 'body'))
 
@@ -16,20 +18,32 @@ class PGPMessage(object):
         Has method for consuming the data using a PacketParser as message.consume
     """
     def __init__(self):
-        self.keys = {}
+        self.tags = ValueTracker()
+    
+    ####################
+    ### CONSUMING
+    ####################
     
     @property
-    def consumer(self):
+    def packet_consumer(self):
         """Memoized PacketParser"""
-        if not hasattr(self, '_consumer'):
+        if not hasattr(self, '_packet_consumer'):
             from packet_parser import PacketParser
-            self._consumer = PacketParser(self.keys)
-        return self._consumer
+            self._packet_consumer = PacketParser()
+        return self._packet_consumer
+    
+    @property
+    def subsignature_consumer(self):
+        """Memoized SubSignatureParser"""
+        if not hasattr(self, '_subsignature_consumer'):
+            from packet_parser import SubSignatureParser
+            self._subsignature_consumer = SubSignatureParser()
+        return self._subsignature_consumer
     
     def consume(self, region):
         """
-            Decrypt a message.
-            Bytes can be specified to handle nested packets
+            Consume a message.
+            Region can be specified to handle nested packets
             Otherwise, defaults to the byte stream on the Message object itself
 
             If a string is passed in as region, it is converted to a bitstream for you
@@ -37,11 +51,37 @@ class PGPMessage(object):
         if isinstance(region, (str, unicode)):
             region = bitstring.ConstBitStream(bytes=region)
 
-        self.consumer.consume(self, region)
+        self.packet_consumer.consume(self, region)
+    
+    def consume_subsignature(self, region):
+        """
+            Consume subsignature packets
+            Region can be specified to handle nested packets
+            Otherwise, defaults to the byte stream on the Message object itself
+
+            If a string is passed in as region, it is converted to a bitstream for you
+        """
+        if isinstance(region, (str, unicode)):
+            region = bitstring.ConstBitStream(bytes=region)
+
+        self.subsignature_consumer.consume(self, region)
+    
+    ####################
+    ### ADDING TAGS
+    ####################
+    
+    def start_tag(self, tag):
+        """Record start of a new tag"""
+        self.tags.start_item(tag)
+    
+    def end_tag(self):
+        """Record end of a new tag"""
+        self.tags.end_item()
 
 ####################
 ### ENCRYPTED MESSAGE
 ####################
+
 class EncryptedMessage(PGPMessage):
     def __init__(self, keys):
         super(EncryptedMessage, self).__init__()
@@ -73,10 +113,38 @@ class EncryptedMessage(PGPMessage):
         self._plaintext.append(plaintext)
 
 ####################
-### SECRET KEY
+### KEY
 ####################
 
-class SecretKey(PGPMessage):
-    def parse_keys(self, region):
+class Key(PGPMessage):
+    def __init__(self, passphrase=None):
+        super(Key, self).__init__()
+        self.passphrase = passphrase
+        self.public_keys = ValueTracker()
+        self.secret_keys = ValueTracker()
+    
+    def parse(self, region):
         self.consume(region)
-        return self.keys
+        return self
+    
+    ####################
+    ### ADDING KEYS
+    ####################
+    
+    def add_public_key(self, info):
+        """Start a new public key"""
+        self.public_keys.end_item()
+        self.public_keys.start_item(info)
+    
+    def add_secret_key(self, info):
+        """Start a new secret key"""
+        self.secret_keys.end_item()
+        self.secret_keys.start_item(info)
+    
+    def add_sub_public_key(self, info):
+        """Add a sub public key"""
+        self.public_keys.start_item(info)
+    
+    def add_sub_secret_key(self, info):
+        """Add a sub secret key"""
+        self.secret_keys.start_item(info)

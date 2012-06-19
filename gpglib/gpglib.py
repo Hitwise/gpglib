@@ -1,6 +1,6 @@
 from Crypto.PublicKey import RSA
 
-from structures import EncryptedMessage, SecretKey
+from structures import EncryptedMessage, Key
 
 if __name__ == '__main__':
     key = RSA.importKey(open('../tests/data/gpg/key.asc').read())
@@ -21,8 +21,8 @@ if __name__ == '__main__':
     print message.plaintext
 
     data = open('../tests/data/key.secret.gpg').read()
-    message = SecretKey(data)
-    keys = message.parse_keys()
+    key = Key()
+    keys = message.parse(data)
 
     print "Message successfully parsed secret_key.gpg::"
     print keys
