@@ -25,17 +25,25 @@ class PGPMessage(object):
     ####################
     
     @property
-    def consumer(self):
+    def packet_consumer(self):
         """Memoized PacketParser"""
-        if not hasattr(self, '_consumer'):
+        if not hasattr(self, '_packet_consumer'):
             from packet_parser import PacketParser
-            self._consumer = PacketParser(self.keys)
-        return self._consumer
+            self._packet_consumer = PacketParser()
+        return self._packet_consumer
+    
+    @property
+    def subpacket_consumer(self):
+        """Memoized SubPacketParser"""
+        if not hasattr(self, '_subpacket_consumer'):
+            from packet_parser import SubPacketParser
+            self._subpacket_consumer = SubPacketParser()
+        return self._subpacket_consumer
     
     def consume(self, region):
         """
-            Decrypt a message.
-            Bytes can be specified to handle nested packets
+            Consume a message.
+            Region can be specified to handle nested packets
             Otherwise, defaults to the byte stream on the Message object itself
 
             If a string is passed in as region, it is converted to a bitstream for you
@@ -43,7 +51,20 @@ class PGPMessage(object):
         if isinstance(region, (str, unicode)):
             region = bitstring.ConstBitStream(bytes=region)
 
-        self.consumer.consume(self, region)
+        self.packet_consumer.consume(self, region)
+    
+    def consume_subpackets(self, region):
+        """
+            Consume subpackets
+            Region can be specified to handle nested packets
+            Otherwise, defaults to the byte stream on the Message object itself
+
+            If a string is passed in as region, it is converted to a bitstream for you
+        """
+        if isinstance(region, (str, unicode)):
+            region = bitstring.ConstBitStream(bytes=region)
+
+        self.subpacket_consumer.consume(self, region)
 
     ####################
     ### TAG RECORDING

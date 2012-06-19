@@ -7,11 +7,20 @@ from Crypto.Hash import SHA
 
 import errors
 
+####################
+### DELEGATORS
+####################
+
 class ContentParser(object):
     """Delegator to the different content parsers"""
     def __init__(self):
         self.parsers = {}
         self.parse_unknown = Parser()
+
+        # Instantiate parsers from find_parsers
+        # Recommended ContentParser is memoized when created
+        for tag_type, kls in self.find_parsers():
+            self.parsers[tag_type] = kls()
         
     def consume(self, tag, message, kwargs):
         """
@@ -24,14 +33,11 @@ class ContentParser(object):
         
         # Consume the desired region
         return parser.consume(tag, message, tag.body, **kwargs)
-    
+
+class PacketContentParser(ContentParser):
     def find_parsers(self):
-        """
-            Add parsers to this instance of ContentParser
-            It's recommended that only one instance of this class is ever generated
-            So this setup only has to happen once
-        """
-        parsers = (
+        """Specifiy parsers"""
+        return (
               (1, PubSessionKeyParser)
             , (2, SignatureParser)
             , (5, SecretKeyParser)
@@ -41,9 +47,15 @@ class ContentParser(object):
             , (11, LiteralParser)
             , (13, UserIdParser)
             )
-        
-        for tag_type, kls in parsers:
-            self.parsers[tag_type] = kls()
+
+class SubPacketContentParser(ContentParser):
+    def find_parsers(self):
+        """Add parsers"""
+        return ()
+
+####################
+### PARSERS
+####################
 
 class Parser(object):
     """Base Parser class"""
