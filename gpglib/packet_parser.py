@@ -40,7 +40,9 @@ class PacketParser(object):
             tag = self.next_tag(region)
 
             # Pass the results from the previous parser call to the next one
+            message.start_tag(tag)
             kwargs = self.content_parser.consume(tag, message, kwargs) or {}
+            message.end_tag()
         return message
     
     def next_tag(self, region):

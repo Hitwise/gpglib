@@ -17,6 +17,12 @@ class PGPMessage(object):
     """
     def __init__(self):
         self.keys = {}
+        self._tags = {'tags' : []}
+        self._current_tag = None
+    
+    ####################
+    ### CONSUMING
+    ####################
     
     @property
     def consumer(self):
@@ -39,9 +45,49 @@ class PGPMessage(object):
 
         self.consumer.consume(self, region)
 
+    ####################
+    ### TAG RECORDING
+    ####################
+
+    @property
+    def consumed_tags(self):
+        """Return list of consumed tags"""
+        return list(self.tag_numbers(self._tags))
+
+    def start_tag(self, tag):
+        """Record the start of a tag"""
+        parent = self._tags
+        if self._current_tag:
+            parent = self._current_tag
+
+        next_tag = {'tags' : [], 'info' : tag, 'parent' : parent}
+        self._current_tag = next_tag
+
+        parent['tags'].append(next_tag)
+
+    def end_tag(self):
+        """Record that a tag was finished"""
+        self._current_tag = self._current_tag['parent']
+
+    def tag_numbers(self, tags):
+        """
+            Get a list from the heirarchy of recorded tags
+            [[tag_type, children], tag_type, tag_type, [tag_type, children]]
+
+            Where the ones of [tag_type, children] have the same list but for it's children
+        """
+        if tags:
+            for tag in tags['tags']:
+                tag_type = tag['info'].tag_type
+                if tag['tags']:
+                    yield [tag_type, list(self.tag_numbers(tag))]
+                else:
+                    yield tag_type
+
 ####################
 ### ENCRYPTED MESSAGE
 ####################
+
 class EncryptedMessage(PGPMessage):
     def __init__(self, keys):
         super(EncryptedMessage, self).__init__()
