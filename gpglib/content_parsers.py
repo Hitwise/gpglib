@@ -33,9 +33,11 @@ class ContentParser(object):
         """
         parsers = (
               (1, PubSessionKeyParser)
+            , (5, SecretKeyParser)
             , (8, CompressedParser)
             , (9, SymEncryptedParser)
             , (11, LiteralParser)
+            , (13, UserIdParser)
             )
         
         for tag_type, kls in parsers:
@@ -123,7 +125,37 @@ class PubSessionKeyParser(Parser):
             'session_key': session_key,
         }
 
-class CompressedParser(object):
+class SecretKeyParser(Parser):
+    def consume(self, tag, message, region):
+        # TODO: Refactor out the public-key portion of this function when we need
+        # to parse public key packets
+
+        # Get the version of the public key
+        public_key_version = region.read(8).uint
+
+        # Only version 4 packets are supported
+        if public_key_version != 4:
+            raise NotImplementedError("Public key versions != 4 are not supported. Upgrade your PGP!")
+
+        # The creation time of the secret key
+        ctime = region.read(8*4).uint
+
+        # Get the public key algorithm used by this key
+        algo = region.read(8).uint
+
+        if algo != 1:  # only RSA is supported
+            raise NotImplementedError("Public key algorithm '%d' not supported" % algo)
+
+        # Get the `n` value of the RSA public key (encoded as an MPI)
+        rsa_n = self.parse_mpi(region).uint
+
+        # Get the exponent of the RSA public key (encoded as an MPI)
+        rsa_e = self.parse_mpi(region).uint
+
+        # Now for the secret portion of the key
+        print rsa_e
+
+class CompressedParser(Parser):
     """Parse compressed packets"""
     def consume(self, tag, message, region):
         # Get the compression algorithm used
@@ -132,7 +164,7 @@ class CompressedParser(object):
         if algo != 1:  # we only support ZIP compression for now
             raise NotImplementedError("Compression type '%d' not supported" % algo)
 
-        # Use zlib to decompress the packet. The -13 at the end is the window size.
+        # Use zlib to decompress the packet. The -15 at the end is the window size.
         # It says to ignore the zlib header (because it's negative) and that the
         # data is compressed with up to 15 bits of compression.
         uncompressed = zlib.decompress(region.read('bytes'), -15)
@@ -175,8 +207,8 @@ class SymEncryptedParser(Parser):
         # Parse the inner packet and return it
         return message.consume(decrypted)
 
-class LiteralParser(object):
-    """No-op parser that sets the given data onto `message`"""
+class LiteralParser(Parser):
+    """Extracts various information from the packet but only returns the plaintext"""
     def consume(self, tag, message, region):
         # Is it binary ('b'), text ('t') or utf-8 text ('u')
         format = region.read(8).bytes
@@ -193,3 +225,8 @@ class LiteralParser(object):
 
         # Add the literal data to the list of decrypted plaintext
         message.add_plaintext(region.read('bytes'))
+
+class UserIdParser(Parser):
+    """Parses type-13 packets, which contain information about the user"""
+    def consume(self, tag, message, region):
+        message.userid = region.bytes
