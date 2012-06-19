@@ -4,26 +4,22 @@ import bitstring
 # Information obtained from an OpenPGP header
 Tag = namedtuple('Tag', ('version', 'tag_type', 'body'))
 
-class Message(object):
-    """
-        Class to hold details about a message:
-            * keys
-            * data is the string representing the original data
-              It is converted to a bitstream for you
-            * Results form decrypt process
-    """
-    def __init__(self, keys, data):
-        self.keys = keys
-        self.bytes = bitstring.ConstBitStream(bytes=data)
-        self._plaintext = []
+####################
+### BASE MESSAGE
+####################
 
-    @property
-    def plaintext(self):
-        """
-            Concatenate all plaintext found in the message
-            Requires decrypt to have already been called
-        """
-        return ''.join(self._plaintext)
+class PGPMessage(object):
+    """
+        Class to hold details about a pgp message:
+        Whether that be keys or encrypted data
+
+        Accepts data for the message
+            * Converts data into a bitstream as message.bytes
+
+        Has method for consuming the data using a PacketParser as message.consume
+    """
+    def __init__(self, data):
+        self.bytes = bitstring.ConstBitStream(bytes=data)
     
     @property
     def consumer(self):
@@ -32,14 +28,6 @@ class Message(object):
             from packet_parser import PacketParser
             self._consumer = PacketParser(self.keys)
         return self._consumer
-    
-    def decrypt(self, region=None):
-        """
-            Consume the provided data
-            And return the plaintext on the message
-        """
-        self.consume(region)
-        return self.plaintext
     
     def consume(self, region=None):
         """
@@ -57,6 +45,32 @@ class Message(object):
 
         self.consumer.consume(self, region)
 
+####################
+### ENCRYPTED MESSAGE
+####################
+
+class EncryptedMessage(PGPMessage):
+    def __init__(self, data, keys):
+        super(EncryptedMessage, self).__init__(data)
+        self.keys = keys
+        self._plaintext = []
+    
+    def decrypt(self, region=None):
+        """
+            Consume the provided data
+            And return the plaintext on the message
+        """
+        self.consume(region)
+        return self.plaintext
+
+    @property
+    def plaintext(self):
+        """
+            Concatenate all plaintext found in the message
+            Requires decrypt to have already been called
+        """
+        return ''.join(self._plaintext)
+
     def add_plaintext(self, plaintext):
         """
             More plaintext was found
@@ -64,3 +78,9 @@ class Message(object):
             I could be wrong about that....
         """
         self._plaintext.append(plaintext)
+
+####################
+### PRIVATE KEY
+####################
+
+class PrivateKey(PGPMessage): pass
