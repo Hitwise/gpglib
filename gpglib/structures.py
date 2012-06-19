@@ -20,6 +20,7 @@ class PGPMessage(object):
     """
     def __init__(self, data):
         self.bytes = bitstring.ConstBitStream(bytes=data)
+        self.keys = {}
     
     @property
     def consumer(self):
@@ -80,7 +81,10 @@ class EncryptedMessage(PGPMessage):
         self._plaintext.append(plaintext)
 
 ####################
-### PRIVATE KEY
+### SECRET KEY
 ####################
 
-class PrivateKey(PGPMessage): pass
+class SecretKey(PGPMessage):
+    def parse_keys(self, region=None):
+        self.consume(region)
+        return self.keys
