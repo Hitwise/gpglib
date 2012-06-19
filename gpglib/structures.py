@@ -1,6 +1,8 @@
 from collections import namedtuple
 import bitstring
 
+from utils import ValueTracker
+
 # Information obtained from an OpenPGP header
 Tag = namedtuple('Tag', ('version', 'tag_type', 'body'))
 
@@ -16,9 +18,7 @@ class PGPMessage(object):
         Has method for consuming the data using a PacketParser as message.consume
     """
     def __init__(self):
-        self.keys = {}
-        self._tags = {'tags' : []}
-        self._current_tag = None
+        self.tags = ValueTracker()
     
     ####################
     ### CONSUMING
@@ -65,45 +65,18 @@ class PGPMessage(object):
             region = bitstring.ConstBitStream(bytes=region)
 
         self.subsignature_consumer.consume(self, region)
-
+    
     ####################
-    ### TAG RECORDING
+    ### ADDING TAGS
     ####################
-
-    @property
-    def consumed_tags(self):
-        """Return list of consumed tags"""
-        return list(self.tag_numbers(self._tags))
-
+    
     def start_tag(self, tag):
-        """Record the start of a tag"""
-        parent = self._tags
-        if self._current_tag:
-            parent = self._current_tag
-
-        next_tag = {'tags' : [], 'info' : tag, 'parent' : parent}
-        self._current_tag = next_tag
-
-        parent['tags'].append(next_tag)
-
+        """Record start of a new tag"""
+        self.tags.start_item(tag)
+    
     def end_tag(self):
-        """Record that a tag was finished"""
-        self._current_tag = self._current_tag['parent']
-
-    def tag_numbers(self, tags):
-        """
-            Get a list from the heirarchy of recorded tags
-            [[tag_type, children], tag_type, tag_type, [tag_type, children]]
-
-            Where the ones of [tag_type, children] have the same list but for it's children
-        """
-        if tags:
-            for tag in tags['tags']:
-                tag_type = tag['info'].tag_type
-                if tag['tags']:
-                    yield [tag_type, list(self.tag_numbers(tag))]
-                else:
-                    yield tag_type
+        """Record end of a new tag"""
+        self.tags.end_item()
 
 ####################
 ### ENCRYPTED MESSAGE
@@ -140,10 +113,37 @@ class EncryptedMessage(PGPMessage):
         self._plaintext.append(plaintext)
 
 ####################
-### SECRET KEY
+### KEY
 ####################
 
-class SecretKey(PGPMessage):
-    def parse_keys(self, region):
+class Key(PGPMessage):
+    def __init__(self):
+        super(Key, self).__init__()
+        self.public_keys = ValueTracker()
+        self.secret_keys = ValueTracker()
+    
+    def parse(self, region):
         self.consume(region)
-        return self.keys
+        return self
+    
+    ####################
+    ### ADDING KEYS
+    ####################
+    
+    def add_public_key(self, info):
+        """Start a new public key"""
+        self.public_keys.end_item()
+        self.public_keys.start_item(info)
+    
+    def add_secret_key(self, info):
+        """Start a new secret key"""
+        self.secret_keys.end_item()
+        self.secret_keys.start_item(info)
+    
+    def add_sub_public_key(self, info):
+        """Add a sub public key"""
+        self.public_keys.start_item(info)
+    
+    def add_sub_secret_key(self, info):
+        """Add a sub secret key"""
+        self.secret_keys.start_item(info)
