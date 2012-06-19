@@ -1,3 +1,4 @@
+import itertools
 import zlib
 
 import bitstring
@@ -6,6 +7,23 @@ from Crypto.Cipher import CAST, PKCS1_v1_5
 from Crypto.Hash import SHA
 
 import errors
+
+# Mapping of PGP encryption algorithm types to a PyCrypto module which implements
+# that particular algorithm
+ENCRYPTION_ALGORITHMS = {
+    3: CAST,  # CAST5
+}
+
+# Mapping of encryption algorithms to a their standard PGP key sizes
+CIPHER_KEY_SIZES = {
+    CAST: 16,  # CAST5
+}
+
+# Mapping of PGP hash algorithm types to a PyCrypto module which implements
+# that particular algorithm
+HASH_ALGORITHMS = {
+    2: SHA,  # SHA-1
+}
 
 class ContentParser(object):
     """Delegator to the different content parsers"""
@@ -33,7 +51,9 @@ class ContentParser(object):
         """
         parsers = (
               (1, PubSessionKeyParser)
+            , (2, SecretKeyParser)
             , (5, SecretKeyParser)
+            , (7, SecretKeyParser)
             , (8, CompressedParser)
             , (9, SymEncryptedParser)
             , (11, LiteralParser)
@@ -55,6 +75,61 @@ class Parser(object):
         # Read in the MPI bytes and return the resulting bitstream
         mpi_length = (raw_mpi_length + 7) / 8
         return region.read(mpi_length*8)
+
+    def parse_s2k(self, region, cipher=None, passphrase=None):
+        # Get the 'string-to-key specifier'
+        s2k_specifier = region.read(8).uint
+
+        if s2k_specifier != 3:  # we only support '3' (iterated + salted) for now
+            raise NotImplementedError("String-to-key type '%d' hasn't been implemented" % s2k_specifier)
+
+        # The hash algorithm used by the string-to-key value
+        s2k_hash_algo = region.read(8).uint
+
+        # Get a hash object we can use
+        hasher = HASH_ALGORITHMS.get(s2k_hash_algo)
+        if not hasher:
+            raise NotImplementedError("Hash type '%d' hasn't been implemented" % s2k_hash_algo)
+
+        # The salt value used for the hash
+        salt = region.read(8*8).bytes
+
+        # The 'count' is the length of the data that gets hashed
+        raw_count = region.read(8).uint
+        count = (16 + (raw_count & 15)) << ((raw_count >> 4) + 6)
+
+        # The size of the key (in bytes)
+        key_size = CIPHER_KEY_SIZES[cipher]
+
+        # TODO: Clean this up
+
+        # Initialize the result to an empty string
+        result = ''
+
+        # Infinite for loop
+        for i in itertools.count():
+            # Initialize an infinite stream of salts + passphrases
+            stream = itertools.cycle(list(salt + passphrase))
+
+            # Initialize the message, which is at a minimum:
+            #   some nulls || salt || passphrase
+            message = ('\x00' * i) + salt + passphrase
+
+            # Fill the rest of the message (up to `count`) with the string `salt + passphrase`
+            message += ''.join(itertools.islice(stream, count - len(message)))
+
+            # Now hash the message
+            hash = hasher.new(message).digest()
+
+            # Append the message to the result, until len(result) == count
+            size = min(len(hash), key_size - len(result))
+            result += hash[0:size]
+
+            # Break if the result is large enough
+            if len(result) >= key_size:
+                break
+
+        return result
 
 class PubSessionKeyParser(Parser):
     """Parse public session key packet"""
@@ -127,6 +202,8 @@ class PubSessionKeyParser(Parser):
 
 class SecretKeyParser(Parser):
     def consume(self, tag, message, region):
+        if tag.tag_type == 2 or tag.tag_type == 5:
+            return
         # TODO: Refactor out the public-key portion of this function when we need
         # to parse public key packets
 
@@ -141,10 +218,10 @@ class SecretKeyParser(Parser):
         ctime = region.read(8*4).uint
 
         # Get the public key algorithm used by this key
-        algo = region.read(8).uint
+        public_key_algo = region.read(8).uint
 
-        if algo != 1:  # only RSA is supported
-            raise NotImplementedError("Public key algorithm '%d' not supported" % algo)
+        if public_key_algo != 1:  # only RSA is supported
+            raise NotImplementedError("Public key algorithm '%d' not supported" % public_key_algo)
 
         # Get the `n` value of the RSA public key (encoded as an MPI)
         rsa_n = self.parse_mpi(region).uint
@@ -153,7 +230,50 @@ class SecretKeyParser(Parser):
         rsa_e = self.parse_mpi(region).uint
 
         # Now for the secret portion of the key
-        print rsa_e
+        # Get the 'string-to-key' type of the secret key. If it's 0, the key is
+        # not encrypted. If it's 254 or 255, it's the value of the string-to-key
+        # specifier. If it's anything else, it's the type of symmetric encryption
+        # algorithm used.
+        s2k_type = region.read(8).uint
+
+        if s2k_type != 254:  # for now, force s2k == 254
+            raise NotImplementedError("String-to-key type '%d' not supported" % s2k_type)
+        
+        # Get the symmetric encryption algorithm used
+        encryption_algo = region.read(8).uint
+
+        # Get a cipher object we can use to decrypt the key (and fail if we can't)
+        cipher = ENCRYPTION_ALGORITHMS.get(encryption_algo)
+        if not cipher:
+            raise NotImplementedError("Symmetric encryption type '%d' hasn't been implemented" % algo)
+
+        # This is the passphrase used to decrypt the secret key
+        key_password = self.parse_s2k(region, cipher, 'Hitwise')
+
+        # The IV is the next `block_size` bytes
+        iv = region.read(cipher.block_size*8).bytes
+
+        # Initialize our decryptor
+        decryptor = cipher.new(key_password, cipher.MODE_OPENPGP, iv)
+
+        # Fetch and decrypt the ciphertext (the remaining bytes in `region`)
+
+        encrypted = region.read('bytes')
+        #decrypted = decryptor.decrypt(encrypted)
+        decrypted = decryptor.decrypt(encrypted)
+
+        crap2 = '\x0f\xf8\xf6K\x15\xda\x99\xf8'
+        crap = ''
+        for i, thing in enumerate(iv):
+            crap += chr(ord(thing) ^ ord(encrypted[i]))
+            print bin(ord(encrypted[i])), bin(ord(thing)), bin(ord(crap2[i]))
+        decrypted = crap + decrypted[8:]
+        print decrypted.encode('string_escape')
+        stream = bitstring.ConstBitStream(bytes=decrypted)
+
+        hash = SHA.new(stream.read(stream.len-160).bytes).digest()
+        print hash.encode('string_escape'), stream.read(160).bytes.encode('string_escape')
+
 
 class CompressedParser(Parser):
     """Parse compressed packets"""
@@ -174,15 +294,9 @@ class CompressedParser(Parser):
 
 class SymEncryptedParser(Parser):
     """Parse symmetrically encrypted data packet"""
-    # Mapping of PGP encryption algorithm types to a PyCrypto module which implements
-    # that particular algorithm
-    ENCRYPTION_ALGORITHMS = {
-        3: CAST,  # CAST5
-    }
-
     def consume(self, tag, message, region, algo, session_key):
         # Get the encryption algorithm used
-        cipher = self.ENCRYPTION_ALGORITHMS.get(algo)
+        cipher = ENCRYPTION_ALGORITHMS.get(algo)
         if not cipher:
             raise NotImplementedError("Symmetric encryption type '%d' hasn't been implemented" % algo)
 
