@@ -13,13 +13,9 @@ class PGPMessage(object):
         Class to hold details about a pgp message:
         Whether that be keys or encrypted data
 
-        Accepts data for the message
-            * Converts data into a bitstream as message.bytes
-
         Has method for consuming the data using a PacketParser as message.consume
     """
-    def __init__(self, data):
-        self.bytes = bitstring.ConstBitStream(bytes=data)
+    def __init__(self):
         self.keys = {}
     
     @property
@@ -30,7 +26,7 @@ class PGPMessage(object):
             self._consumer = PacketParser(self.keys)
         return self._consumer
     
-    def consume(self, region=None):
+    def consume(self, region):
         """
             Decrypt a message.
             Bytes can be specified to handle nested packets
@@ -38,9 +34,6 @@ class PGPMessage(object):
 
             If a string is passed in as region, it is converted to a bitstream for you
         """
-        if region is None:
-            region = self.bytes
-
         if isinstance(region, (str, unicode)):
             region = bitstring.ConstBitStream(bytes=region)
 
@@ -49,14 +42,13 @@ class PGPMessage(object):
 ####################
 ### ENCRYPTED MESSAGE
 ####################
-
 class EncryptedMessage(PGPMessage):
-    def __init__(self, data, keys):
-        super(EncryptedMessage, self).__init__(data)
+    def __init__(self, keys):
+        super(EncryptedMessage, self).__init__()
         self.keys = keys
         self._plaintext = []
     
-    def decrypt(self, region=None):
+    def decrypt(self, region):
         """
             Consume the provided data
             And return the plaintext on the message
@@ -85,6 +77,6 @@ class EncryptedMessage(PGPMessage):
 ####################
 
 class SecretKey(PGPMessage):
-    def parse_keys(self, region=None):
+    def parse_keys(self, region):
         self.consume(region)
         return self.keys

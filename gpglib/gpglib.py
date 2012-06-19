@@ -20,7 +20,7 @@ if __name__ == '__main__':
     print "Message successfully decrypted data.big.dump::"
     print message.plaintext
 
-    data = open('../tests/data/secret_key.gpg').read()
+    data = open('../tests/data/key.secret.gpg').read()
     message = SecretKey(data)
     keys = message.parse_keys()
 

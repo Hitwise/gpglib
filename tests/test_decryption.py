@@ -8,9 +8,9 @@ import unittest
 
 describe "decryption":
     it "works with with small data":
-        message = EncryptedMessage(data.get_encrypted('small'), data.get_rsa_keys())
-        self.assertEqual(message.decrypt(), data.get_original('small'))
+        message = EncryptedMessage(data.get_rsa_keys())
+        self.assertEqual(message.decrypt(data.get_encrypted('small')), data.get_original('small'))
 
     it "works with big data":
-        message = EncryptedMessage(data.get_encrypted('big'), data.get_rsa_keys())
-        self.assertEqual(message.decrypt(), data.get_original('big'))
+        message = EncryptedMessage(data.get_rsa_keys())
+        self.assertEqual(message.decrypt(data.get_encrypted('big')), data.get_original('big'))

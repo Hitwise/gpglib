@@ -15,6 +15,9 @@ def get_original(namespace):
 def get_encrypted(namespace):
     return get_file("data.%s.dump.gpg" % namespace)
 
+def get_pgp_key(namespace):
+    return get_file("key.%s.gpg" % namespace)
+
 def get_rsa_key(name):
     return RSA.importKey(get_file(name))
     
