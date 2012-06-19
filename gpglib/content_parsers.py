@@ -52,7 +52,7 @@ class Parser(object):
 
     def only_implemented(self, received, implemented, message):
         if received not in implemented:
-            raise NotImplementedError("%s |:| Sorry, haven't implemented value %d. Have only implemented %s." % (self.name, received, message))
+            raise NotImplementedError("%s |:| Sorry, haven't implemented value %s. Have only implemented %s." % (self.name, received, message))
 
     @property
     def name(self):
@@ -139,6 +139,7 @@ class SignatureParser(Parser):
         self.only_implemented(version, (4, ), "version four signature packets")
 
         signature_type = region.read(8).uint
+        self.only_implemented(signature_type, (0x13, 0x18), "UserId and Subkey binding signatures")
 
         public_key_algorithm = region.read(8).uint
         self.only_implemented(public_key_algorithm, (1, ), "RSA Encrypt or sign public keys")
@@ -265,4 +266,4 @@ class LiteralParser(Parser):
 class UserIdParser(Parser):
     """Parses type-13 packets, which contain information about the user"""
     def consume(self, tag, message, region):
-        message.userid = region.bytes
+        message.userid = region.read('bytes')
