@@ -64,7 +64,7 @@ class PGPMessage(object):
         if isinstance(region, (str, unicode)):
             region = bitstring.ConstBitStream(bytes=region)
 
-        self.subpacket_consumer.consume(self, region)
+        self.subsignature_consumer.consume(self, region)
 
     ####################
     ### TAG RECORDING

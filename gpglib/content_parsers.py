@@ -15,12 +15,20 @@ class ContentParser(object):
     """Delegator to the different content parsers"""
     def __init__(self):
         self.parsers = {}
-        self.parse_unknown = Parser()
+        self.parse_unknown = self.parser_for_unknown()
 
         # Instantiate parsers from find_parsers
         # Recommended ContentParser is memoized when created
         for tag_type, kls in self.find_parsers():
             self.parsers[tag_type] = kls()
+
+    def parser_for_unknown(self):
+        """Return instantiated parser to handle unknown tags"""
+        return Parser()
+
+    def find_parsers(self):
+        """Specify lits of [(tag_type, kls), (tag_type, kls), ...] for kls to handle each tag type"""
+        raise NotImplemented
         
     def consume(self, tag, message, kwargs):
         """
@@ -50,8 +58,18 @@ class PacketContentParser(ContentParser):
 
 class SubSignatureContentParser(ContentParser):
     def find_parsers(self):
-        """Add parsers"""
+        """Don't handle any sub signature packets yet"""
         return ()
+
+    def parser_for_unknown(self):
+        """Return instantiated parser to handle unknown tags"""
+        def consume(parser, tag, message, region, subsignature=None):
+            if not subsignature:
+                subsignature = {}
+            subsignature[tag.tag_type] = region.read('bytes')
+            return {'subsignature' : subsignature}
+
+        return type("SignatureParser", (Parser, ), {'consume' : consume})()
 
 ####################
 ### PARSERS
@@ -161,12 +179,12 @@ class SignatureParser(Parser):
 
         # Determine hashed data
         hashed_subpacket_length = region.read(8*2).uint
-        hashed_subpacket_data = region.read(hashed_subpacket_length * 8)
+        hashed_subpacket_data = message.consume_subsignature(region.read(hashed_subpacket_length * 8))
 
         # Not cyrptographically protected by signature
         # Should only contain advisory information
         unhashed_subpacket_length = region.read(8*2).uint
-        unhashed_subpacket_data = region.read(unhashed_subpacket_length * 8)
+        unhashed_subpacket_data = message.consume_subsignature(region.read(unhashed_subpacket_length * 8))
 
         # Left 16 bits of the signed hash value provided for a heuristic test for valid signatures
         left_of_signed_hash = region.read(8*2)

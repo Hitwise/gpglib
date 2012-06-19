@@ -196,4 +196,32 @@ class PacketParser(Parser):
 class SubSignatureParser(Parser):
     """SubSignaturePackets are a bit different to normal packets"""
     content_parser_kls = SubSignatureContentParser
-    pass
+
+    def next_tag(self, region):
+        """Called to get the next tag from the region"""
+        # First few octets says the length of the subpacket
+        body_length = self.determine_body_length(region)
+
+        # After length is the tag type and then the body of the message
+        body = region.read(body_length*8)
+        tag_type = body.read(8).uint
+
+        return Tag(version=None, tag_type=tag_type, body=body)
+
+    def determine_body_length(self, region):
+        """RFC 4880 5.2.3.1"""
+        length_type = region.peek(8).uint
+
+        if length_type < 192:
+            return region.read(8).uint
+        
+        elif length_type < 255:
+            # TODO: Make this nicer
+            return ((region.read(8).uint - 192) << 8) + (region.read(8).uint + 192)
+        
+        elif length_type == 255:
+            # Ignore the first octet (255 just says to look at next 4)
+            region.read(8)
+            
+            # Add up the next four octets
+            return region.read(8*4).uint
