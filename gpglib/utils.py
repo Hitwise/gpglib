@@ -1,3 +1,10 @@
+def dump(bytes):
+    """Return a readable string for a string of bytes"""
+    r = []
+    for i in range(len(bytes)):
+        r.append("%02x" % ord(bytes[i]))
+    return ' '.join(r)
+
 class ValueTracker(object):
     """Track heirarchial relations of some items"""
     def __init__(self):
