@@ -1,7 +1,7 @@
 from Crypto.PublicKey import RSA
 import bitstring
 
-from content_parsers import PacketContentParser, SubPacketContentParser
+from content_parsers import PacketContentParser, SubSignatureContentParser
 from errors import PGPFormatException
 from structures import Tag
 
@@ -10,7 +10,7 @@ from structures import Tag
 ####################
 
 class Parser(object):
-    """Base for PacketContentParser and SubPacketContentParser"""
+    """Base for PacketContentParser and SubSignatureParser"""
     content_parser_kls = None
 
     def __init__(self):
@@ -190,10 +190,10 @@ class PacketParser(Parser):
             return None
 
 ####################
-### SUB PACKETS
+### SUB SIGNATURE PACKETS
 ####################
 
-class SubPacketParser(Parser):
-    """SubPackets are a bit different to normal packets"""
-    content_parser_kls = SubPacketContentParser
+class SubSignatureParser(Parser):
+    """SubSignaturePackets are a bit different to normal packets"""
+    content_parser_kls = SubSignatureContentParser
     pass

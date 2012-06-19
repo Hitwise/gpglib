@@ -48,7 +48,7 @@ class PacketContentParser(ContentParser):
             , (13, UserIdParser)
             )
 
-class SubPacketContentParser(ContentParser):
+class SubSignatureContentParser(ContentParser):
     def find_parsers(self):
         """Add parsers"""
         return ()

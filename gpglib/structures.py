@@ -33,12 +33,12 @@ class PGPMessage(object):
         return self._packet_consumer
     
     @property
-    def subpacket_consumer(self):
-        """Memoized SubPacketParser"""
-        if not hasattr(self, '_subpacket_consumer'):
-            from packet_parser import SubPacketParser
-            self._subpacket_consumer = SubPacketParser()
-        return self._subpacket_consumer
+    def subsignature_consumer(self):
+        """Memoized SubSignatureParser"""
+        if not hasattr(self, '_subsignature_consumer'):
+            from packet_parser import SubSignatureParser
+            self._subsignature_consumer = SubSignatureParser()
+        return self._subsignature_consumer
     
     def consume(self, region):
         """
@@ -53,9 +53,9 @@ class PGPMessage(object):
 
         self.packet_consumer.consume(self, region)
     
-    def consume_subpackets(self, region):
+    def consume_subsignature(self, region):
         """
-            Consume subpackets
+            Consume subsignature packets
             Region can be specified to handle nested packets
             Otherwise, defaults to the byte stream on the Message object itself
 
