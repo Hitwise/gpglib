@@ -21,9 +21,7 @@ def get_decryptor_and_message(key_location, message_location, passphrase):
     message = open(message_location).read()
     return EncryptedMessage(keys=keys), message
 
-def start_loop(key_location, message_location, passphrase):
-    decryptor, message = get_decryptor_and_message(key_location, message_location, passphrase)
-    
+def start_loop(decrypt_action):    
     # Initial things
     count = 0
     total = 0
@@ -35,7 +33,7 @@ def start_loop(key_location, message_location, passphrase):
     try:
         while True:
             # Decrypt again, increment count
-            decryptor.decrypt(message)
+            decrypt_action()
             count += 1
             total += 1
             

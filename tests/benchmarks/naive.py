@@ -4,7 +4,7 @@
     Where the keyword is naive
 """
 
-from base import start_loop
+from base import get_decryptor_and_message, start_loop
 import multiprocessing
 import argparse
 
@@ -24,20 +24,25 @@ if __name__ == '__main__':
     args = parser.parse_args()
     loop_kwargs = dict(
           key_location = "tests/data/key.secret.gpg"
-        , message_location = 'tests/data/data.big.dump.gpg'
+        , message_location = 'tests/data/data.small.dump.gpg'
         , passphrase = 'blahandstuff'
         )
+    
+    def run(key_location, message_location, passphrase):
+        decryptor, message = get_decryptor_and_message(key_location, message_location, passphrase)
+        decrypt_action = lambda : decryptor.decrypt(message)
+        start_loop(decrypt_action)
     
     if args.number_processes == 0:
         print "Processed infinite messages in 0 seconds"
     
     elif args.number_processes == 1:
-        start_loop(**loop_kwargs)
+        run(**loop_kwargs)
     
     else:
         processes = []
         for _ in range(args.number_processes):
-            process = multiprocessing.Process(target=start_loop, kwargs=loop_kwargs)
+            process = multiprocessing.Process(target=run, kwargs=loop_kwargs)
             processes.append(process)
             process.start()
         
