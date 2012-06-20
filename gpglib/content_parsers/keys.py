@@ -148,39 +148,42 @@ class SecretKeyParser(PublicKeyParser):
         # algorithm used.
         s2k_type = region.read(8).uint
 
-        if s2k_type != 254:  # for now, force s2k == 254
+        if s2k_type == 254:
+            # Get the symmetric encryption algorithm used
+            encryption_algo = region.read(8).uint
+
+            # Get a cipher object we can use to decrypt the key (and fail if we can't)
+            cipher = ENCRYPTION_ALGORITHMS.get(encryption_algo)
+            if not cipher:
+                raise NotImplementedError("Symmetric encryption type '%d' hasn't been implemented" % algo)
+
+            # This is the passphrase used to decrypt the secret key
+            key_passphrase = self.parse_s2k(region, cipher, message.passphrase(message, info))
+
+            # The IV is the next `block_size` bytes
+            iv = region.read(cipher.block_size*8).bytes
+
+            # Use the hacky crypt_CFB func to decrypt the MPIs
+            result = self.crypt_CFB(region, cipher, key_passphrase, iv)
+            decrypted = bitstring.ConstBitStream(bytes=result)
+
+            # The decrypted bytes are in the format of:
+            #   MPIs || 20-octet SHA1 hash
+            # Read in the MPIs
+            mpis = decrypted.read(decrypted.len-(8*20))
+
+            # Hash the bytes
+            generated_hash = SHA.new(mpis.bytes).digest()
+            # Read in the 'real' hash
+            real_hash = decrypted.read(160).bytes
+
+            if generated_hash != real_hash:
+                raise errors.PGPException("Secret key hashes don't match. Check your passphrase")
+        elif s2k_type == 0:
+            mpis = region
+        else:
             raise NotImplementedError("String-to-key type '%d' not supported" % s2k_type)
-        
-        # Get the symmetric encryption algorithm used
-        encryption_algo = region.read(8).uint
 
-        # Get a cipher object we can use to decrypt the key (and fail if we can't)
-        cipher = ENCRYPTION_ALGORITHMS.get(encryption_algo)
-        if not cipher:
-            raise NotImplementedError("Symmetric encryption type '%d' hasn't been implemented" % algo)
-
-        # This is the passphrase used to decrypt the secret key
-        key_passphrase = self.parse_s2k(region, cipher, message.passphrase(message, info))
-
-        # The IV is the next `block_size` bytes
-        iv = region.read(cipher.block_size*8).bytes
-
-        # Use the hacky crypt_CFB func to decrypt the MPIs
-        result = self.crypt_CFB(region, cipher, key_passphrase, iv)
-        decrypted = bitstring.ConstBitStream(bytes=result)
-
-        # The decrypted bytes are in the format of:
-        #   MPIs || 20-octet SHA1 hash
-        # Read in the MPIs
-        mpis = decrypted.read(decrypted.len-(8*20))
-
-        # Hash the bytes
-        generated_hash = SHA.new(mpis.bytes).digest()
-        # Read in the 'real' hash
-        real_hash = decrypted.read(160).bytes
-
-        if generated_hash != real_hash:
-            raise errors.PGPException("Secret key hashes don't match. Check your passphrase")
         
         # Get mpi values from decrypted
         rsa_d = self.parse_mpi(mpis)
