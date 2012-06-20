@@ -1,3 +1,5 @@
+from gpglib.structures import Key
+
 from Crypto.PublicKey import RSA
 import os
 
@@ -17,9 +19,7 @@ def get_encrypted(namespace):
 
 def get_pgp_key(namespace):
     return get_file("key.%s.gpg" % namespace)
-
-def get_rsa_key(name):
-    return RSA.importKey(get_file(name))
     
-def get_rsa_keys():
-    return {5524596192824459786 : get_rsa_key("gpg/key.asc")}
+def get_keys():
+    key = Key(passphrase='blahandstuff').parse(get_pgp_key('secret'))
+    return key.key_dict()
