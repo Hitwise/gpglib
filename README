@@ -7,13 +7,12 @@ And shelling out to gpg is slow when you do it for many small files.
 
 So, with the help of http://pypi.python.org/pypi/OpenPGP and PyCrypto we created this, which is more performant than shelling out....
 
-
 Making test data
 ================
 
-This is what I did to get the data in test.data
+This is what I did to get the data in test.data.
 
-inside tests/data::
+Inside tests/data::
 
     $ gpg --gen-key --homedir ./gpg
     # I gave it all default options, username Stephen and password "blahandstuff"
@@ -28,29 +27,44 @@ Then find the keyid::
         # sub   2048R/80C7020A 2012-06-15
     # Here, the key we want is "80C7020A"
     
-Then with that keyid (after installing monkeysphere so I can have openpgp2ssh) ::
+Then with that keyid export the secret and public keys:
 
-    $ echo "blahandstuff" > pw
-    $ gpg --passphrase-fd 3 3<pw --export-options export-reset-subkey-passwd --homedir ./gpg --export-secret-subkeys 80C7020A | openpgp2ssh 80C7020A > gpg/key.asc
-    $ rm pw
+    $ gpg --export 80C7020A > key.public.gpg
+    $ gpg --export-secret-key 80C7020A > key.secret.gpg
 
-Note that the pw stuff is because openpgp2ssh will otherwise complain with "we cannot handle encrypted secret keys".
-
-I then created data.dump as one of the examples on http://json.org/example.html and did the following to make data.dump.gpg::
+I then created data.small.dump and data.big.dump as random json structures (the big on is from http://json.org/example.html) and did the following to make the encrypted .gpg equivalent::
     
     $ gpg -o data.dump.gpg --cipher-algo CAST5 --compress-algo ZIP --yes --disable-mdc --homedir ./gpg  -r Stephen --encrypt data.dump
 
 Tests
 =====
 
-$ pip install -r test_requirements.txt
+Install the pip requirements::
+
+    $ pip install -r requirements_test.txt
 
 Install nosy if you want the ability to make tests autorun when you run the tests (https://bitbucket.org/delfick/nosy)
 
-And then run
-$ ./test.sh
+And then run::
 
-Or if you have nosy
-$ nosy ./test.sh
+    $ ./test.sh
 
-Currently not much is tested
+Or if you have nosy::
+
+    $ nosy ./test.sh
+
+Currently not much is tested.
+
+Docs
+====
+
+Install the pip requirements::
+
+    $ pip install -r requirements_docs.txt
+
+And then go into the docs directory and run make::
+
+    $ cd docs
+    $ make html
+
+Open up docs/_build/html/index.html in your browser.
