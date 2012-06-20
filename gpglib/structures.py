@@ -120,31 +120,32 @@ class Key(PGPMessage):
     def __init__(self, passphrase=None):
         super(Key, self).__init__()
         self.passphrase = passphrase
-        self.public_keys = ValueTracker()
-        self.secret_keys = ValueTracker()
+        self.keys = ValueTracker()
     
     def parse(self, region):
         self.consume(region)
         return self
+
+    def key_dict(self, keys=None):
+        if keys is None:
+            keys = self.keys.consumed()
+
+        result = {}
+        for key, subkeys in keys:
+            result[key['key_id']] = key['key']
+            result.update(self.key_dict(subkeys))
+        return result
     
     ####################
     ### ADDING KEYS
     ####################
     
-    def add_public_key(self, info):
+    def add_key(self, info):
         """Start a new public key"""
-        self.public_keys.end_item()
-        self.public_keys.start_item(info)
+        self.keys.end_item()
+        self.keys.start_item(info)
     
-    def add_secret_key(self, info):
-        """Start a new secret key"""
-        self.secret_keys.end_item()
-        self.secret_keys.start_item(info)
-    
-    def add_sub_public_key(self, info):
+    def add_sub_key(self, info):
         """Add a sub public key"""
-        self.public_keys.start_item(info)
-    
-    def add_sub_secret_key(self, info):
-        """Add a sub secret key"""
-        self.secret_keys.start_item(info)
+        self.keys.start_item(info)
+

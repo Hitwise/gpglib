@@ -41,11 +41,7 @@ class ValueTracker(object):
         if items:
             for item in items['items']:
                 info = self.values_from(item['info'], keys, modifiers)
-                
-                if item['items']:
-                    yield [info, list(self.items(item, keys, modifiers))]
-                else:
-                    yield info
+                yield info, list(self.items(item, keys, modifiers))
     
     def values_from(self, info, keys, modifiers):
         """Extract wanted information from info"""

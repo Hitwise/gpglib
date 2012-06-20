@@ -1,4 +1,5 @@
 from gpglib import utils, errors
+
 from base import Parser, ENCRYPTION_ALGORITHMS, CIPHER_KEY_SIZES, HASH_ALGORITHMS
 from Crypto.Hash import SHA
 from Crypto.PublicKey import RSA
@@ -43,7 +44,11 @@ class SignatureParser(Parser):
 class KeyParser(Parser):
     def consume(self, tag, message, region):
         info = self.consume_common(tag, message, region)
+        pos_before = region.pos
         info['mpi_values'] = self.consume_mpi(tag, message, region, algorithm=info['algorithm'])
+        pos_after = region.pos
+        region.pos = pos_before
+        info['raw_mpi_values'] = region.read(pos_after - pos_before).bytes
         self.consume_rest(tag, message, region, info)
         self.add_value(message, info)
     
@@ -54,6 +59,20 @@ class KeyParser(Parser):
     def add_value(self, message, info):
         """Used to add information for this key to the message"""
         raise NotImplementedError
+    
+    def determine_key_id(self, info):
+        # Calculate the key ID
+        fingerprint_data = chr(info['key_version']) + \
+                           bitstring.Bits(uint=info['ctime'], length=4*8).bytes + \
+                           chr(info['algorithm']) + \
+                           info['raw_mpi_values']
+        fingerprint_length = len(fingerprint_data)
+        fingerprint_data = '\x99' + \
+                           chr((0xffff & fingerprint_length) >> 8) + \
+                           chr(0xff & fingerprint_length) + \
+                           fingerprint_data
+        fingerprint = SHA.new(fingerprint_data).hexdigest().upper()[-16:]
+        return int(fingerprint, 16)
     
     def consume_common(self, tag, message, region):
         """Common to all key types"""
@@ -88,7 +107,7 @@ class KeyParser(Parser):
         
         else:
             raise errors.PGPException("Unknown public key type %d" % algorithm)
-    
+
     def rsa_mpis(self, region):
         """n and e"""
         n = self.parse_mpi(region)
@@ -112,12 +131,14 @@ class KeyParser(Parser):
 
 class PublicKeyParser(KeyParser):
     def add_value(self, message, info):
-        message.add_public_key(info)
+        message.add_key(info)
 
-class SecretKeyParser(KeyParser):
-    def add_value(self, message, info):
-        message.add_secret_key(info)
-    
+    def consume_rest(self, tag, message, region, info):
+        mpi_tuple = (info['mpi_values']['n'], info['mpi_values']['e'])
+        info['key'] = RSA.construct(long(i.uint) for i in mpi_tuple)
+        info['key_id'] = self.determine_key_id(info)
+
+class SecretKeyParser(PublicKeyParser):
     def consume_rest(self, tag, message, region, info):
         """Already have public key things"""
         # Now for the secret portion of the key
@@ -139,7 +160,7 @@ class SecretKeyParser(KeyParser):
             raise NotImplementedError("Symmetric encryption type '%d' hasn't been implemented" % algo)
 
         # This is the passphrase used to decrypt the secret key
-        key_passphrase = self.parse_s2k(region, cipher, 'blahandstuff')
+        key_passphrase = self.parse_s2k(region, cipher, message.passphrase)
 
         # The IV is the next `block_size` bytes
         iv = region.read(cipher.block_size*8).bytes
@@ -175,7 +196,8 @@ class SecretKeyParser(KeyParser):
             rsa_q,
             rsa_u,
         )
-        return RSA.construct(long(i.uint) for i in mpi_tuple)
+        info['key'] = RSA.construct(long(i.uint) for i in mpi_tuple)
+        info['key_id'] = self.determine_key_id(info)
     
     def crypt_CFB(self, region, ciphermod, key, iv):
         """
@@ -200,9 +222,9 @@ class SecretKeyParser(KeyParser):
 class PublicSubKeyParser(PublicKeyParser):
     """Same format as Public Key"""
     def add_value(self, message, info):
-        message.add_sub_public_key(info)
+        message.add_sub_key(info)
 
 class SecretSubKeyParser(SecretKeyParser):
     """Same format as Secret Key"""
     def add_value(self, message, info):
-        message.add_sub_secret_key(info)
+        message.add_sub_key(info)

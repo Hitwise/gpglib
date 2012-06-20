@@ -9,13 +9,14 @@ import nose
 describe "Consuming keys":
     it "successfully consumes a secret key":
         secret_key = Key(passphrase='blahandstuff').parse(data.get_pgp_key('secret'))
-        print secret_key.tags.consumed('tag_type')
-        print secret_key.secret_keys.items()
-        print secret_key.secret_keys.consumed(tag=lambda info, key, tag: tag.tag_type)
-        assert False
+        # Parent key
+        self.assertIn(4259707814030784140, secret_key.key_dict())
+        # Sub-key
+        self.assertIn(5524596192824459786, secret_key.key_dict())
     
     it "successfully consumes a public key":
         public_key = Key().parse(data.get_pgp_key('public'))
-        print public_key.tags.consumed('tag_type')
-        print public_key.public_keys.consumed(tag=lambda info, key, tag: tag.tag_type)
-        assert False
+        # Parent key
+        self.assertIn(3166937994423974160, public_key.key_dict())
+        # Sub-key
+        self.assertIn(11980534847294644458L, public_key.key_dict())
