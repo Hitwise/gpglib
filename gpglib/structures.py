@@ -119,8 +119,16 @@ class EncryptedMessage(PGPMessage):
 class Key(PGPMessage):
     def __init__(self, passphrase=None):
         super(Key, self).__init__()
-        self.passphrase = passphrase
         self.keys = ValueTracker()
+
+        # If passphrase is a string, create a function which returns it, else
+        # set passphrase to the function provided
+        if isinstance(passphrase, (str, unicode)):
+            def get_passphrase(message, info):
+                return passphrase
+            self.passphrase = get_passphrase
+        else:
+            self.passphrase = passphrase
     
     def parse(self, region):
         self.consume(region)

@@ -160,7 +160,7 @@ class SecretKeyParser(PublicKeyParser):
             raise NotImplementedError("Symmetric encryption type '%d' hasn't been implemented" % algo)
 
         # This is the passphrase used to decrypt the secret key
-        key_passphrase = self.parse_s2k(region, cipher, message.passphrase)
+        key_passphrase = self.parse_s2k(region, cipher, message.passphrase(message, info))
 
         # The IV is the next `block_size` bytes
         iv = region.read(cipher.block_size*8).bytes
