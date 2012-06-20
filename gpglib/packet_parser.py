@@ -87,18 +87,18 @@ class PacketParser(Parser):
         """Determine the version, tag_type and body_bit_length of the next packet"""
         # Tag information is held by the first 8 bytes
         tag = region.read(8)
-
+        
+        # Get left bit and version from first two bits
+        left_bit, version = tag.readlist("uint:1, uint:1")
+        
         # The left-most bit *MUST* be 1
-        if not tag.read(1).uint:
-            raise PGPFormatException("The left-most bit of the tag ('%x') was not 1" % tag.uint)
+        if not left_bit:
+            raise PGPFormatException("The left-most bit of the tag ('%x') was not 1" % tag.read('uint'))
 
-        # The second bit is the version
         # How the tag is parsed changes between the two versions
-        version = tag.read(1).uint
         if version == 1:
             # Read the tag type as the next 6 bits
-            tag_type = tag.read(6).uint
-
+            tag_type = tag.read('uint:6')
             return self.parse_new_tag(tag_type, region)
         else:
             return self.parse_old_tag(tag, region)
@@ -108,7 +108,7 @@ class PacketParser(Parser):
             The length of the packet is then determined by the next group of bytes
         """
         # We peek at the next byte to determine what type of length to get
-        length_type = region.peek(8).uint
+        length_type = region.peek('uint:8')
         body_length = self.determine_new_body_length(length_type, region)
 
         # Determine the body of the packet
@@ -133,8 +133,7 @@ class PacketParser(Parser):
             Type is the first four
             and length is determined by the two after that
         """
-        tag_type = tag.read(4).uint
-        length_type = tag.read(2).uint
+        tag_type, length_type = tag.readlist('uint:4, uint:2')
         
         if length_type == 3:  # indeterminate length untill the end of the file
             body_length = None
@@ -155,7 +154,7 @@ class PacketParser(Parser):
         """Determine body length of an old style packet"""
         if length_type < 3:
             octet_length = 2**length_type
-            return region.read(8*octet_length).uint
+            return region.read('uint:%d' % (8*octet_length))
         else:
             # indeterminate length untill the end of the file
             return None
@@ -169,18 +168,18 @@ class PacketParser(Parser):
             otherwise it is partial length
         """
         if length_type < 192:
-            return region.read(8).uint
+            return region.read('uint:8')
         
         elif length_type < 224:
-            # TODO: Make this nicer
-            return ((region.read(8).uint - 192) << 8) + (region.read(8).uint + 192)
+            one, two = region.readlist('uint:8, uint:8')
+            return ((one - 192) << 8) + (two + 192)
         
         elif length_type == 255:
             # Ignore the first octet (255 just says to look at next 4)
             region.read(8)
             
             # Add up the next four octets
-            return region.read(8*4).uint
+            return region.read('uint:32')
         
         else:
             # Length_type hasn't been read yet, just peeked
@@ -204,24 +203,24 @@ class SubSignatureParser(Parser):
 
         # After length is the tag type and then the body of the message
         body = region.read(body_length*8)
-        tag_type = body.read(8).uint
+        tag_type = body.read('uint:8')
 
         return Tag(version=None, tag_type=tag_type, body=body)
 
     def determine_body_length(self, region):
         """RFC 4880 5.2.3.1"""
-        length_type = region.peek(8).uint
+        length_type = region.peek('uint:8')
 
         if length_type < 192:
-            return region.read(8).uint
+            return region.read('uint:8')
         
         elif length_type < 255:
-            # TODO: Make this nicer
-            return ((region.read(8).uint - 192) << 8) + (region.read(8).uint + 192)
+            one, two = region.readlist('uint:8, uint:8')
+            return ((one - 192) << 8) + (two + 192)
         
         elif length_type == 255:
             # Ignore the first octet (255 just says to look at next 4)
             region.read(8)
             
             # Add up the next four octets
-            return region.read(8*4).uint
+            return region.read('uint:32')

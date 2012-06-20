@@ -11,25 +11,23 @@ import binascii
 class SignatureParser(Parser):
     """Signature packets describes a binding between some public key and some data"""
     def consume(self, tag, message, region):
-        version = region.read(8).uint
+        # Get values
+        data = """
+        uint:8,  uint:8,         uint:8,               uint:8,         uint:16"""
+        version, signature_type, public_key_algorithm, hash_algorithm, hashed_subpacket_length = region.readlist(data)
+        
+        # Complain if any values haven't been implemented yet
         self.only_implemented(version, (4, ), "version four signature packets")
-
-        signature_type = region.read(8).uint
         self.only_implemented(signature_type, (0x13, 0x18), "UserId and Subkey binding signatures")
-
-        public_key_algorithm = region.read(8).uint
         self.only_implemented(public_key_algorithm, (1, ), "RSA Encrypt or sign public keys")
-
-        hash_algorithm = region.read(8).uint
         self.only_implemented(hash_algorithm, (2, ), "SHA-1 hashing")
 
         # Determine hashed data
-        hashed_subpacket_length = region.read(8*2).uint
         hashed_subpacket_data = message.consume_subsignature(region.read(hashed_subpacket_length * 8))
 
         # Not cyrptographically protected by signature
         # Should only contain advisory information
-        unhashed_subpacket_length = region.read(8*2).uint
+        unhashed_subpacket_length = region.read('uint:16')
         unhashed_subpacket_data = message.consume_subsignature(region.read(unhashed_subpacket_length * 8))
 
         # Left 16 bits of the signed hash value provided for a heuristic test for valid signatures
@@ -37,7 +35,7 @@ class SignatureParser(Parser):
 
         # Get the mpi value for the RSA hash
         # RSA signature value m**d mod n
-        mdn = self.parse_mpi(region).uint
+        mdn = self.parse_mpi(region).read('uint')
 
         return None
 
@@ -48,7 +46,8 @@ class KeyParser(Parser):
         info['mpi_values'] = self.consume_mpi(tag, message, region, algorithm=info['algorithm'])
         pos_after = region.pos
         region.pos = pos_before
-        info['raw_mpi_values'] = region.read(pos_after - pos_before).bytes
+        mpi_length = (pos_after - pos_before) / 8
+        info['raw_mpi_values'] = region.read('bytes:%d' % mpi_length)
         self.consume_rest(tag, message, region, info)
         self.add_value(message, info)
     
@@ -76,18 +75,16 @@ class KeyParser(Parser):
     
     def consume_common(self, tag, message, region):
         """Common to all key types"""
-        # Get the version of the public key
-        public_key_version = region.read(8).uint
+        # Version of the public key
+        # Creation time of the secret key
+        # Public key algorithm used by this key
+        data = """
+        uint:8,             uint:32, uint:8"""
+        public_key_version, ctime,   public_key_algo = region.readlist(data)
 
         # Only version 4 packets are supported
         if public_key_version != 4:
             raise NotImplementedError("Public key versions != 4 are not supported. Upgrade your PGP!")
-
-        # The creation time of the secret key
-        ctime = region.read(8*4).uint
-
-        # Get the public key algorithm used by this key
-        public_key_algo = region.read(8).uint
 
         if public_key_algo != 1:  # only RSA is supported
             raise NotImplementedError("Public key algorithm '%d' not supported" % public_key_algo)
@@ -135,7 +132,7 @@ class PublicKeyParser(KeyParser):
 
     def consume_rest(self, tag, message, region, info):
         mpi_tuple = (info['mpi_values']['n'], info['mpi_values']['e'])
-        info['key'] = RSA.construct(long(i.uint) for i in mpi_tuple)
+        info['key'] = RSA.construct(long(i.read('uint')) for i in mpi_tuple)
         info['key_id'] = self.determine_key_id(info)
 
 class SecretKeyParser(PublicKeyParser):
@@ -146,13 +143,13 @@ class SecretKeyParser(PublicKeyParser):
         # not encrypted. If it's 254 or 255, it's the value of the string-to-key
         # specifier. If it's anything else, it's the type of symmetric encryption
         # algorithm used.
-        s2k_type = region.read(8).uint
+        s2k_type = region.read('uint:8')
 
         if s2k_type != 254:  # for now, force s2k == 254
             raise NotImplementedError("String-to-key type '%d' not supported" % s2k_type)
         
-        # Get the symmetric encryption algorithm used
-        encryption_algo = region.read(8).uint
+        # Symmetric encryption algorithm used
+        encryption_algo = region.read('uint:8')
 
         # Get a cipher object we can use to decrypt the key (and fail if we can't)
         cipher = ENCRYPTION_ALGORITHMS.get(encryption_algo)
@@ -163,7 +160,7 @@ class SecretKeyParser(PublicKeyParser):
         key_passphrase = self.parse_s2k(region, cipher, message.passphrase(message, info))
 
         # The IV is the next `block_size` bytes
-        iv = region.read(cipher.block_size*8).bytes
+        iv = region.read('bytes:%d' % cipher.block_size)
 
         # Use the hacky crypt_CFB func to decrypt the MPIs
         result = self.crypt_CFB(region, cipher, key_passphrase, iv)
@@ -177,7 +174,7 @@ class SecretKeyParser(PublicKeyParser):
         # Hash the bytes
         generated_hash = SHA.new(mpis.bytes).digest()
         # Read in the 'real' hash
-        real_hash = decrypted.read(160).bytes
+        real_hash = decrypted.read('bytes:20')
 
         if generated_hash != real_hash:
             raise errors.PGPException("Secret key hashes don't match. Check your passphrase")
@@ -196,7 +193,7 @@ class SecretKeyParser(PublicKeyParser):
             rsa_q,
             rsa_u,
         )
-        info['key'] = RSA.construct(long(i.uint) for i in mpi_tuple)
+        info['key'] = RSA.construct(long(i.read('uint')) for i in mpi_tuple)
         info['key_id'] = self.determine_key_id(info)
     
     def crypt_CFB(self, region, ciphermod, key, iv):
@@ -204,14 +201,23 @@ class SecretKeyParser(PublicKeyParser):
             Shamelessly stolen from OpenPGP (with some modifications)
             http://pypi.python.org/pypi/OpenPGP
         """
+        # Create the cipher
         cipher = ciphermod.new(key, ciphermod.MODE_ECB)
-        shift = ciphermod.block_size * 8  # number of bytes to process (normally 8)
         
+        # Determine how many bytes to process at a time
+        shift = ciphermod.block_size
+        
+        # Create a bitstring list of ['bytes:8', 'bytes:8', 'bytes:3']
+        # Such that the entire remaining region length gets consumed
+        region_length = (region.len - region.pos) / 8
+        region_datas = ['bytes:%d' % shift] * (region_length/shift)
+        leftover = region_length % shift
+        if leftover:
+            region_datas.append('bytes:%d' % (region_length % shift))
+        
+        # Use the cipher to decrypt region
         blocks = []
-        while region.pos != region.len:
-            shift = min(shift, region.len-region.pos)
-            
-            inblock = region.read(shift).bytes
+        for inblock in region.readlist(region_datas):
             mask = cipher.encrypt(iv)
             chunk = ''.join(chr(ord(c) ^ ord(m)) for m, c in itertools.izip(mask, inblock))
             iv = inblock

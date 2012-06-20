@@ -35,47 +35,41 @@ class Parser(object):
 
     def parse_mpi(self, region):
         # Get the length of the MPI to read in
-        raw_mpi_length = region.read(2*8).uint
+        raw_mpi_length = region.read('uint:16')
         
         # Read in the MPI bytes and return the resulting bitstream
         mpi_length = (raw_mpi_length + 7) / 8
         return region.read(mpi_length*8)
 
     def parse_s2k(self, region, cipher=None, passphrase=None):
-        # Get the 'string-to-key specifier'
-        s2k_specifier = region.read(8).uint
+        # string-to-key specifier'
+        # Hash algorithm used by the string-to-key value
+        # The salt value used for the hash
+        # Count to determine how much data gets hashed
+        data = """
+        uint:8,        uint:8,        bytes:8, uint:8"""
+        s2k_specifier, s2k_hash_algo, salt,    raw_count = region.readlist(data)
 
         if s2k_specifier != 3:  # we only support '3' (iterated + salted) for now
             raise NotImplementedError("String-to-key type '%d' hasn't been implemented" % s2k_specifier)
-
-        # The hash algorithm used by the string-to-key value
-        s2k_hash_algo = region.read(8).uint
 
         # Get a hash object we can use
         hasher = HASH_ALGORITHMS.get(s2k_hash_algo)
         if not hasher:
             raise NotImplementedError("Hash type '%d' hasn't been implemented" % s2k_hash_algo)
 
-        # The salt value used for the hash
-        salt = region.read(8*8).bytes
-
         # The 'count' is the length of the data that gets hashed
-        raw_count = region.read(8).uint
         count = (16 + (raw_count & 15)) << ((raw_count >> 4) + 6)
 
         # The size of the key (in bytes)
         key_size = CIPHER_KEY_SIZES[cipher]
-
-        # TODO: Clean this up
-
-        # Initialize the result to an empty string
-        result = ''
-
+        
+        # Initialize an infinite stream of salts + passphrases
+        stream = itertools.cycle(list(salt + passphrase))
+        
         # Infinite for loop
+        result = []
         for i in itertools.count():
-            # Initialize an infinite stream of salts + passphrases
-            stream = itertools.cycle(list(salt + passphrase))
-
             # Initialize the message, which is at a minimum:
             #   some nulls || salt || passphrase
             message = ('\x00' * i) + salt + passphrase
@@ -88,10 +82,10 @@ class Parser(object):
 
             # Append the message to the result, until len(result) == count
             size = min(len(hash), key_size - len(result))
-            result += hash[0:size]
+            result.extend(hash[0:size])
 
             # Break if the result is large enough
             if len(result) >= key_size:
                 break
 
-        return result
+        return ''.join(result)
