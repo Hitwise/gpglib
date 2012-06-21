@@ -7,6 +7,15 @@ And shelling out to gpg is slow when you do it for many small files.
 
 So, with the help of http://pypi.python.org/pypi/OpenPGP and PyCrypto we created this, which is more performant than shelling out....
 
+Installing
+==========
+
+To install, just use pip::
+
+    $ pip install gpglib
+
+Or download from pypi, http://pypi.python.org/pypi/gpglib.
+
 Making test data
 ================
 
