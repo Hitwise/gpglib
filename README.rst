@@ -14,7 +14,7 @@ To install, just use pip::
 
     $ pip install gpglib
 
-Or download from pypi, http://pypi.python.org/pypi/gpglib.
+Or download from pypi: http://pypi.python.org/pypi/gpglib.
 
 Making test data
 ================
