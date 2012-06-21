@@ -46,9 +46,8 @@ class Parser(object):
         # Hash algorithm used by the string-to-key value
         # The salt value used for the hash
         # Count to determine how much data gets hashed
-        data = """
-        uint:8,        uint:8,        bytes:8, uint:8"""
-        s2k_specifier, s2k_hash_algo, salt,    raw_count = region.readlist(data)
+        s2k_specifier, s2k_hash_algo, salt,    raw_count = region.readlist("""
+        uint:8,        uint:8,        bytes:8, uint:8""")
 
         if s2k_specifier != 3:  # we only support '3' (iterated + salted) for now
             raise NotImplementedError("String-to-key type '%d' hasn't been implemented" % s2k_specifier)

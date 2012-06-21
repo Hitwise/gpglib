@@ -12,9 +12,8 @@ class PubSessionKeyParser(Parser):
         # Version of the packet we're parsing (almost always '3')
         # The id of the key used to encrypt the session key
         # The public key algorithm used to encrypt the session key
-        data = """
-        uint:8, uint:64, uint:8"""
-        version, key_id, key_algo = region.readlist(data)
+        version, key_id, key_algo = region.readlist("""
+        uint:8, uint:64, uint:8""")
 
         # TODO: Implement Elgamal
         self.only_implemented(key_algo, (1, ), "session keys implemented with rsa")
@@ -50,9 +49,8 @@ class PubSessionKeyParser(Parser):
         # The algorithm used to encrypt the message is the first byte
         # The session key is the next 16 bytes
         # The checksum is the last two bytes
-        data = """
-        uint:8, bytes:16,    uint:16"""
-        algo,   session_key, checksum = padded_session_key.readlist(data)
+        algo,   session_key, checksum = padded_session_key.readlist("""
+        uint:8, bytes:16,    uint:16""")
 
         # Generate a checksum from the session_key (section 5.1 in the RFC). This
         # involves summing up all the bytes of the session key and `mod`ing it

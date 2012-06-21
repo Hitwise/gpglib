@@ -12,9 +12,8 @@ class SignatureParser(Parser):
     """Signature packets describes a binding between some public key and some data"""
     def consume(self, tag, message, region):
         # Get values
-        data = """
-        uint:8,  uint:8,         uint:8,               uint:8,         uint:16"""
-        version, signature_type, public_key_algorithm, hash_algorithm, hashed_subpacket_length = region.readlist(data)
+        version, signature_type, public_key_algorithm, hash_algorithm, hashed_subpacket_length = region.readlist("""
+        uint:8,  uint:8,         uint:8,               uint:8,         uint:16""")
         
         # Complain if any values haven't been implemented yet
         self.only_implemented(version, (4, ), "version four signature packets")
@@ -78,9 +77,8 @@ class KeyParser(Parser):
         # Version of the public key
         # Creation time of the secret key
         # Public key algorithm used by this key
-        data = """
-        uint:8,             uint:32, uint:8"""
-        public_key_version, ctime,   public_key_algo = region.readlist(data)
+        public_key_version, ctime,   public_key_algo = region.readlist("""
+        uint:8,             uint:32, uint:8""")
 
         # Only version 4 packets are supported
         if public_key_version != 4:
