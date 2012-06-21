@@ -7,7 +7,7 @@ setup(
     , install_requires =
       [ 'pycrypto'
       , 'bitstring'
-      ],
+      ]
 
     # metadata for upload to PyPI
     , author = "Hitwise"
