@@ -93,6 +93,10 @@ class EncryptedMessage(PGPMessage):
             Consume the provided data
             And return the plaintext on the message
         """
+        # Reset the plaintext
+        self._plaintext = []
+
+        # Consume the stream
         self.consume(region)
         return self.plaintext
 

@@ -9,6 +9,7 @@ def moreContext(app, pagename, templatename, context, doctree):
     
     context['toplinks'] = [
           ('Overview', p('/index.html')    , pagename=='index')
+        , ('About',    p('/about.html')    , pagename=='about')
         , ('Examples', p('/examples.html') , pagename=='examples')
         , ('Features', p('/features.html') , pagename=='features')
         , ('Dev',      p('/dev/index.html'), pagename.startswith('dev'))
