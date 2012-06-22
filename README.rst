@@ -16,6 +16,8 @@ To install, just use pip::
 
 Or download from pypi: http://pypi.python.org/pypi/gpglib.
 
+Or clone the git repo: https://github.com/Hitwise/gpglib.
+
 Making test data
 ================
 
