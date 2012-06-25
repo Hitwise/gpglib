@@ -79,3 +79,5 @@ And then go into the docs directory and run make::
     $ make html
 
 Open up docs/_build/html/index.html in your browser.
+
+Automatically generated documentation is available at: http://gpglib.readthedocs.org/en/latest/
