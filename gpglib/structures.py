@@ -18,6 +18,9 @@ class PGPMessage(object):
         Has method for consuming the data using a PacketParser as message.consume
     """
     def __init__(self):
+        self.reset()
+
+    def reset(self):
         self.tags = ValueTracker()
     
     ####################
@@ -84,8 +87,11 @@ class PGPMessage(object):
 
 class EncryptedMessage(PGPMessage):
     def __init__(self, keys):
-        super(EncryptedMessage, self).__init__()
         self.keys = keys
+        super(EncryptedMessage, self).__init__()
+
+    def reset(self):
+        super(EncryptedMessage, self).reset()
         self._plaintext = []
     
     def decrypt(self, region):
@@ -94,7 +100,7 @@ class EncryptedMessage(PGPMessage):
             And return the plaintext on the message
         """
         # Reset the plaintext
-        self._plaintext = []
+        self.reset()
 
         # Consume the stream
         self.consume(region)
@@ -122,19 +128,25 @@ class EncryptedMessage(PGPMessage):
 
 class Key(PGPMessage):
     def __init__(self, passphrase=None):
+        self._passphrase = passphrase
         super(Key, self).__init__()
+
+    def reset(self):
+        super(Key, self).reset()
         self.keys = ValueTracker()
 
-        # If passphrase is a string, create a function which returns it, else
-        # set passphrase to the function provided
-        if isinstance(passphrase, (str, unicode)):
+    @property
+    def passphrase(self):
+        """Return a function to get the passphrase"""
+        if not callable(self._passphrase):
+            _passphrase = self._passphrase
             def get_passphrase(message, info):
-                return passphrase
-            self.passphrase = get_passphrase
-        else:
-            self.passphrase = passphrase
+                return _passphrase
+            self._passphrase = get_passphrase
+        return self._passphrase
     
     def parse(self, region):
+        self.reset()
         self.consume(region)
         return self
 
@@ -160,4 +172,3 @@ class Key(PGPMessage):
     def add_sub_key(self, info):
         """Add a sub public key"""
         self.keys.start_item(info)
-

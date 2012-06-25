@@ -9,7 +9,7 @@ Example
 
     data = open('tests/data/key.secret.gpg').read()
     key = Key(passphrase='blahandstuff')
-    key.consume(data)
+    key.parse(data)
     keys = key.key_dict()
     print keys
     

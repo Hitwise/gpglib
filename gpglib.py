@@ -5,7 +5,7 @@ from gpglib.structures import EncryptedMessage, Key
 if __name__ == '__main__':
     data = open('tests/data/key.secret.gpg').read()
     key = Key(passphrase='blahandstuff')
-    key.consume(data)
+    key.parse(data)
     keys = key.key_dict()
     print keys
     
