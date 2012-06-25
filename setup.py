@@ -13,6 +13,6 @@ setup(
     , author = "Hitwise"
     , author_email = "nobody@hitwise.com"
     , description = "Library for decrypting gpg that doesn't shell out to gpg"
-    , license = "WTFPL"
+    , license = "LGPLv2"
     , keywords = "gpg decrypt"
     )

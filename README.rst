@@ -16,6 +16,8 @@ To install, just use pip::
 
 Or download from pypi: http://pypi.python.org/pypi/gpglib.
 
+Or clone the git repo: https://github.com/Hitwise/gpglib.
+
 Making test data
 ================
 
@@ -77,3 +79,5 @@ And then go into the docs directory and run make::
     $ make html
 
 Open up docs/_build/html/index.html in your browser.
+
+Automatically generated documentation is available at: http://gpglib.readthedocs.org/en/latest/

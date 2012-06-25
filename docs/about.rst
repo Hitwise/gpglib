@@ -8,7 +8,7 @@ This library was made with a particular need in mind and hence does the bare min
  * Parse PGP RSA Secret Keys
  * Decrypt CAST5 encrypted, ZIP compressed PGP messages
  
-It provides a simple interface to do this with (see :ref:`examples`) and done with a readable/understand implementation.
+It provides a simple interface to do this with (see :ref:`examples`) and done with a readable/understandable implementation.
 
 Some Background
 ===============
