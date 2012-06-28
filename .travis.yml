@@ -1,6 +1,10 @@
 language: python
-python:
-  - 2.7
 
-install: pip install -r requirements_test.txt --use-mirrors
+python:
+  - "2.7"
+
+install:
+  - pip install .
+  - pip install -r requirements_test.txt --use-mirrors
+
 script: nosetests --with-noy --with-spec --spec-color --noy-default-kls unittest.TestCase --noy-no-default-imports --nocapture
