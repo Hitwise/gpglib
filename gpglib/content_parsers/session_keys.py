@@ -1,8 +1,8 @@
 from gpglib import errors
 from base import Parser
+from crypt import Mpi
 
 from Crypto.Cipher import PKCS1_v1_5
-from Crypto.Hash import SHA
 from Crypto import Random
 import bitstring
 
@@ -23,7 +23,7 @@ class PubSessionKeyParser(Parser):
             raise errors.PGPException("Data was encrypted with RSA key '%d', which was't found" % key_id)
 
         # Read the encrypted session key
-        encrypted_session_key = self.parse_mpi(region).bytes
+        encrypted_session_key = Mpi.parse(region).bytes
         
         # The encrypted session key is EME-PKCS1-encoded
         # (as described in section 13.1 of the RFC).

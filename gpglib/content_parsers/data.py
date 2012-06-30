@@ -1,7 +1,5 @@
+from crypt import Mapped
 from base import Parser
-
-from Crypto.Cipher import CAST
-import zlib
 
 class CompressedParser(Parser):
     """Parse compressed packets"""
@@ -9,29 +7,19 @@ class CompressedParser(Parser):
         # Get the compression algorithm used
         # And the rest of the message
         algo, rest = region.readlist('uint:8, bytes')
-        self.only_implemented(algo, (1, ), "ZIP compression")
 
-        # Use zlib to decompress the packet. The -15 at the end is the window size.
-        # It says to ignore the zlib header (because it's negative) and that the
-        # data is compressed with up to 15 bits of compression.
-        uncompressed = zlib.decompress(rest, -15)
+        # Get decompressor and use it to decompress the packet
+        decompressor = Mapped.compression.decompression[algo]
+        uncompressed = decompressor(rest)
 
         # Parse the inner packet and return it
         return message.consume(uncompressed)
 
 class SymEncryptedParser(Parser):
     """Parse symmetrically encrypted data packet"""
-    # Mapping of PGP encryption algorithm types to a PyCrypto module which implements
-    # that particular algorithm
-    ENCRYPTION_ALGORITHMS = {
-        3: CAST,  # CAST5
-    }
-
     def consume(self, tag, message, region, algo, session_key):
         # Get the encryption algorithm used
-        cipher = self.ENCRYPTION_ALGORITHMS.get(algo)
-        if not cipher:
-            raise NotImplementedError("Symmetric encryption type '%d' hasn't been implemented" % algo)
+        cipher = Mapped.algorithms.encryption[algo]
 
         # Handy alias for the encryption algo's block size
         block_size = cipher.block_size

@@ -1,24 +1,6 @@
+from crypt import Mapped
+
 import itertools
-
-from Crypto.Cipher import CAST
-from Crypto.Hash import SHA
-
-# Mapping of PGP encryption algorithm types to a PyCrypto module which implements
-# that particular algorithm
-ENCRYPTION_ALGORITHMS = {
-    3: CAST,  # CAST5
-}
-
-# Mapping of encryption algorithms to a their standard PGP key sizes
-CIPHER_KEY_SIZES = {
-    CAST: 16,  # CAST5
-}
-
-# Mapping of PGP hash algorithm types to a PyCrypto module which implements
-# that particular algorithm
-HASH_ALGORITHMS = {
-    2: SHA,  # SHA-1
-}
 
 class Parser(object):
     """Base Parser class"""
@@ -39,15 +21,6 @@ class Parser(object):
     def name(self):
         return self.__class__.__name__
 
-    def parse_mpi(self, region):
-        """Get a multi precision integer from the region"""
-        # Get the length of the MPI to read in
-        raw_mpi_length = region.read('uint:16')
-        
-        # Read in the MPI bytes and return the resulting bitstream
-        mpi_length = (raw_mpi_length + 7) / 8
-        return region.read(mpi_length*8)
-
     def parse_s2k(self, region, cipher=None, passphrase=None):
         """Get and use string to key specifier for region"""
         # string-to-key specifier'
@@ -60,15 +33,13 @@ class Parser(object):
         self.only_implemented(s2k_specifier, (3, ), "String to key type 3")
 
         # Get a hash object we can use
-        hasher = HASH_ALGORITHMS.get(s2k_hash_algo)
-        if not hasher:
-            raise NotImplementedError("Hash type '%d' hasn't been implemented" % s2k_hash_algo)
+        hasher = Mapped.algorithms.hashes[s2k_hash_algo]
 
         # The 'count' is the length of the data that gets hashed
         count = (16 + (raw_count & 15)) << ((raw_count >> 4) + 6)
 
         # The size of the key (in bytes)
-        key_size = CIPHER_KEY_SIZES[cipher]
+        key_size = Mapped.ciphers.key_sizes[cipher]
         
         # Initialize an infinite stream of salts + passphrases
         stream = itertools.cycle(list(salt + passphrase))
