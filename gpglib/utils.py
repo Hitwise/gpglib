@@ -34,9 +34,9 @@ class ValueTracker(object):
     def items(self, items, keys, modifiers):
         """
             Get a list from the heirarchy of recorded items
-            [[item, children], item, item, [item, children]]
+            [[item, children], [item, children], ...]
 
-            Where the ones of [item, children] have the same list but for it's children
+            Where children is of the same format but for the children of item
         """
         if items:
             for item in items['items']:
@@ -44,7 +44,10 @@ class ValueTracker(object):
                 yield info, list(self.items(item, keys, modifiers))
     
     def values_from(self, info, keys, modifiers):
-        """Extract wanted information from info"""
+        """
+            Extract wanted information from info
+            Useful for debugging purposes.
+        """
         # Return info if we don't want to get anything from it
         if not keys and not modifiers:
             return info

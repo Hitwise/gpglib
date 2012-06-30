@@ -46,9 +46,6 @@ class PGPMessage(object):
     def consume(self, region):
         """
             Consume a message.
-            Region can be specified to handle nested packets
-            Otherwise, defaults to the byte stream on the Message object itself
-
             If a string is passed in as region, it is converted to a bitstream for you
         """
         if isinstance(region, (str, unicode)):
@@ -59,9 +56,6 @@ class PGPMessage(object):
     def consume_subsignature(self, region):
         """
             Consume subsignature packets
-            Region can be specified to handle nested packets
-            Otherwise, defaults to the byte stream on the Message object itself
-
             If a string is passed in as region, it is converted to a bitstream for you
         """
         if isinstance(region, (str, unicode)):

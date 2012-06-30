@@ -23,9 +23,15 @@ HASH_ALGORITHMS = {
 class Parser(object):
     """Base Parser class"""
     def consume(self, tag, message, region):
+        """To be implemented by subclasses to do something with the body of the parser"""
         raise NotImplementedError("Don't know about tag type %d" % tag.tag_type)
 
     def only_implemented(self, received, implemented, message):
+        """
+            Useful to raise NotImplementedError when we get a value for something that hasn't been implemented
+            i.e., self.only_implemented(received, (1, 2, 3), "values 1, 2 and 3")
+            Would raise NotImplementedError saying "haven't implemented values 1, 2, and 3" if received is none of those values
+        """
         if received not in implemented:
             raise NotImplementedError("%s |:| Sorry, haven't implemented value %s. Have only implemented %s." % (self.name, received, message))
 
@@ -34,6 +40,7 @@ class Parser(object):
         return self.__class__.__name__
 
     def parse_mpi(self, region):
+        """Get a multi precision integer from the region"""
         # Get the length of the MPI to read in
         raw_mpi_length = region.read('uint:16')
         
@@ -42,6 +49,7 @@ class Parser(object):
         return region.read(mpi_length*8)
 
     def parse_s2k(self, region, cipher=None, passphrase=None):
+        """Get and use string to key specifier for region"""
         # string-to-key specifier'
         # Hash algorithm used by the string-to-key value
         # The salt value used for the hash
@@ -49,8 +57,7 @@ class Parser(object):
         s2k_specifier, s2k_hash_algo, salt,    raw_count = region.readlist("""
         uint:8,        uint:8,        bytes:8, uint:8""")
 
-        if s2k_specifier != 3:  # we only support '3' (iterated + salted) for now
-            raise NotImplementedError("String-to-key type '%d' hasn't been implemented" % s2k_specifier)
+        self.only_implemented(s2k_specifier, (3, ), "String to key type 3")
 
         # Get a hash object we can use
         hasher = HASH_ALGORITHMS.get(s2k_hash_algo)

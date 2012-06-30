@@ -14,7 +14,7 @@ class ContentParser(object):
         self.parse_unknown = self.parser_for_unknown()
 
         # Instantiate parsers from find_parsers
-        # Recommended ContentParser is memoized when created
+        # It is recommended that this instance of ContentParser is memoized when created
         for tag_type, kls in self.find_parsers():
             self.parsers[tag_type] = kls()
 
@@ -23,7 +23,7 @@ class ContentParser(object):
         return Parser()
 
     def find_parsers(self):
-        """Specify lits of [(tag_type, kls), (tag_type, kls), ...] for kls to handle each tag type"""
+        """Specify lists of [(tag_type, kls), (tag_type, kls), ...] for kls to handle each tag type"""
         raise NotImplemented
         
     def consume(self, tag, message, kwargs):

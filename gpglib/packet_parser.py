@@ -135,7 +135,8 @@ class PacketParser(Parser):
         """
         tag_type, length_type = tag.readlist('uint:4, uint:2')
         
-        if length_type == 3:  # indeterminate length untill the end of the file
+        if length_type == 3:
+            # indeterminate length untill the end of the file
             body_length = None
         else:
             # Determine the length of the packet body

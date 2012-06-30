@@ -22,12 +22,14 @@ class SignatureParser(Parser):
         self.only_implemented(hash_algorithm, (2, ), "SHA-1 hashing")
 
         # Determine hashed data
-        hashed_subpacket_data = message.consume_subsignature(region.read(hashed_subpacket_length * 8))
+        subsignature = region.read(hashed_subpacket_length * 8)
+        hashed_subpacket_data = message.consume_subsignature(subsignature)
 
         # Not cyrptographically protected by signature
         # Should only contain advisory information
         unhashed_subpacket_length = region.read('uint:16')
-        unhashed_subpacket_data = message.consume_subsignature(region.read(unhashed_subpacket_length * 8))
+        unhashed_subpacket_body = region.read(unhashed_subpacket_length * 8)
+        unhashed_subpacket_data = message.consume_subsignature(unhashed_subpacket_body)
 
         # Left 16 bits of the signed hash value provided for a heuristic test for valid signatures
         left_of_signed_hash = region.read(8*2)
@@ -36,19 +38,42 @@ class SignatureParser(Parser):
         # RSA signature value m**d mod n
         mdn = self.parse_mpi(region).read('uint')
 
-        return None
-
 class KeyParser(Parser):
+    """
+        Public and Secret keys are the same except Secret keys has some extra information
+        SubKeys have the same format
+        Hence the base takes care of all the common things to both formats and delegates the rest to the subclass
+    """
     def consume(self, tag, message, region):
         info = self.consume_common(tag, message, region)
+
+        # Get individual mpi_values and the raw bytes from the region for those values
+        # The raw stream is required for the fingerprint data when determining key id
+        mpi_values, raw_mpi_bytes = self.get_mpi_values(tag, message, region, info['algorithm'])
+        info['mpi_values'] = mpi_values
+        info['raw_mpi_bytes'] = raw_mpi_bytes
+
+        # Consume the rest of the Key
+        self.consume_rest(tag, message, region, info)
+        self.add_value(message, info)
+
+    def get_mpi_values(self, tag, message, region, algorithm):
+        """
+            * Determine position before
+            * Get individual mpi values
+            * Determine how much was read
+            * Reset region to what it was before
+            * Return byte stream for the amount read in the first pass
+        """
         pos_before = region.pos
-        info['mpi_values'] = self.consume_mpi(tag, message, region, algorithm=info['algorithm'])
+        mpi_values = self.consume_mpi(tag, message, region, algorithm=algorithm)
+
         pos_after = region.pos
         region.pos = pos_before
         mpi_length = (pos_after - pos_before) / 8
-        info['raw_mpi_values'] = region.read('bytes:%d' % mpi_length)
-        self.consume_rest(tag, message, region, info)
-        self.add_value(message, info)
+        raw_mpi_bytes = region.read('bytes:%d' % mpi_length)
+
+        return mpi_values, raw_mpi_bytes
     
     def consume_rest(self, tag, message, region, info):
         """Have common things to all keys in info"""
@@ -59,16 +84,24 @@ class KeyParser(Parser):
         raise NotImplementedError
     
     def determine_key_id(self, info):
-        # Calculate the key ID
-        fingerprint_data = chr(info['key_version']) + \
-                           bitstring.Bits(uint=info['ctime'], length=4*8).bytes + \
-                           chr(info['algorithm']) + \
-                           info['raw_mpi_values']
+        """Calculate the key id"""
+        fingerprint_data = ''.join(
+            [ chr(info['key_version'])
+            , bitstring.Bits(uint=info['ctime'], length=4*8).bytes
+            , chr(info['algorithm'])
+            , info['raw_mpi_bytes']
+            ]
+        )
+
         fingerprint_length = len(fingerprint_data)
-        fingerprint_data = '\x99' + \
-                           chr((0xffff & fingerprint_length) >> 8) + \
-                           chr(0xff & fingerprint_length) + \
-                           fingerprint_data
+        fingerprint_data = ''.join(
+            [ '\x99'
+            , chr((0xffff & fingerprint_length) >> 8)
+            , chr(0xff & fingerprint_length)
+            , fingerprint_data
+            ]
+        )
+
         fingerprint = SHA.new(fingerprint_data).hexdigest().upper()[-16:]
         return int(fingerprint, 16)
     
@@ -84,8 +117,8 @@ class KeyParser(Parser):
         if public_key_version != 4:
             raise NotImplementedError("Public key versions != 4 are not supported. Upgrade your PGP!")
 
-        if public_key_algo != 1:  # only RSA is supported
-            raise NotImplementedError("Public key algorithm '%d' not supported" % public_key_algo)
+        # only RSA is supported
+        self.only_implemented(public_key_algo, (1, ), "RSA public keys")
         
         return dict(tag=tag, key_version=public_key_version, ctime=ctime, algorithm=public_key_algo)
     
@@ -101,7 +134,7 @@ class KeyParser(Parser):
             return self.dsa_mpis(region)
         
         else:
-            raise errors.PGPException("Unknown public key type %d" % algorithm)
+            raise errors.PGPException("Unknown mpi algorithm %d" % algorithm)
 
     def rsa_mpis(self, region):
         """n and e"""
@@ -136,14 +169,16 @@ class PublicKeyParser(KeyParser):
 class SecretKeyParser(PublicKeyParser):
     def consume_rest(self, tag, message, region, info):
         """Already have public key things"""
-        # Now for the secret portion of the key
-        # Get the 'string-to-key' type of the secret key. If it's 0, the key is
-        # not encrypted. If it's 254 or 255, it's the value of the string-to-key
-        # specifier. If it's anything else, it's the type of symmetric encryption
-        # algorithm used.
+        # Get the 'string-to-key' type of the secret key.
+        # If it's:
+        #   * 0 :: key is not encrypted.
+        #   * 254 or 255 :: key is value of the string-to-key specifier
+        #   * otherwise :: key is type of symmetric encryption algorithm used.
         s2k_type = region.read('uint:8')
+        self.only_implemented(s2k_type, (0, 254), "Unencrypted and s2k_type 254")
 
         if s2k_type == 0:
+            # Unencrypted!
             mpis = region
 
         elif s2k_type == 254:
@@ -167,18 +202,17 @@ class SecretKeyParser(PublicKeyParser):
 
             # The decrypted bytes are in the format of:
             #   MPIs || 20-octet SHA1 hash
-            # Read in the MPIs
+            # Read in the MPIs portion of this
             mpis = decrypted.read(decrypted.len-(8*20))
 
-            # Hash the bytes
+            # Hash the mpi bytes
             generated_hash = SHA.new(mpis.bytes).digest()
+
             # Read in the 'real' hash
-            real_hash = decrypted.read(160).bytes
+            real_hash = decrypted.read("bytes:20")
 
             if generated_hash != real_hash:
                 raise errors.PGPException("Secret key hashes don't match. Check your passphrase")
-        else:
-            raise NotImplementedError("String-to-key type '%d' not supported" % s2k_type)
         
         # Get mpi values from decrypted
         rsa_d = self.parse_mpi(mpis)
