@@ -72,42 +72,94 @@ class Mpi(object):
         # Read in the MPI bytes and return the resulting bitstream
         mpi_length = (raw_mpi_length + 7) / 8
         return region.read(mpi_length*8)
+    
+    ####################
+    ### RFC4880 5.5.2 and 5.5.3
+    ####################
 
     @classmethod
-    def consume(cls, region, algorithm):
-        """Retrieve necessary MPI values from region for specified algorithm"""
+    def consume_public(cls, region, algorithm):
+        """Retrieve necessary MPI values from a public key for specified algorithm"""
         if algorithm in (1, 2, 3):
-            return cls.rsa_mpis(region)
+            return cls.rsa_mpis_public(region)
         
         elif algorithm in (16, 20):
-            return cls.elgamal_mpis(region)
+            return cls.elgamal_mpis_public(region)
         
         elif algorithm == 17:
-            return cls.dsa_mpis(region)
+            return cls.dsa_mpis_public(region)
         
         else:
             raise errors.PGPException("Unknown mpi algorithm %d" % algorithm)
 
     @classmethod
-    def rsa_mpis(cls, region):
+    def consume_private(cls, region, algorithm):
+        """Retrieve necessary MPI values from a private key for specified algorithm"""
+        if algorithm in (1, 2, 3):
+            return cls.rsa_mpis_private(region)
+        
+        elif algorithm in (16, 20):
+            return cls.elgamal_mpis_private(region)
+        
+        elif algorithm == 17:
+            return cls.dsa_mpis_private(region)
+        
+        else:
+            raise errors.PGPException("Unknown mpi algorithm %d" % algorithm)
+
+    ####################
+    ### RSA
+    ####################
+
+    @classmethod
+    def rsa_mpis_public(cls, region):
         """n and e"""
         n = cls.parse(region)
         e = cls.parse(region)
-        return dict(n=n, e=e)
+        return (n, e)
+
+    @classmethod
+    def rsa_mpis_private(cls, region):
+        """d, p, q and r"""
+        d = cls.parse(region)
+        p = cls.parse(region)
+        q = cls.parse(region)
+        r = cls.parse(region)
+        return (d, p, q, r)
+    
+    ####################
+    ### ELGAMAL
+    ####################
     
     @classmethod
-    def elgamal_mpis(cls, region):
+    def elgamal_mpis_public(cls, region):
         """p, g and y"""
         p = cls.parse(region)
         g = cls.parse(region)
         y = cls.parse(region)
-        return dict(p=p, g=g, y=y)
+        return (p, g, y)
     
     @classmethod
-    def dsa_mpis(cls, region):
+    def elgamal_mpis_private(cls, region):
+        """x"""
+        x = cls.parse(region)
+        return (x, )
+    
+    ####################
+    ### DSA
+    ####################
+    
+    @classmethod
+    def dsa_mpis_public(cls, region):
         """p, q, g and y"""
         p = cls.parse(region)
         q = cls.parse(region)
         g = cls.parse(region)
         y = cls.parse(region)
-        return dict(p=p, q=q, g=g, y=y)
+        return (p, q, g, y)
+    
+    @classmethod
+    def dsa_mpis_private(cls, region):
+        """x"""
+        x = cls.parse(region)
+        return (x, )

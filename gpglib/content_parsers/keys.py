@@ -75,7 +75,7 @@ class KeyParser(Parser):
             * Return byte stream for the amount read in the first pass
         """
         pos_before = region.pos
-        mpi_values = Mpi.consume(region, algorithm)
+        mpi_values = Mpi.consume_public(region, algorithm)
 
         pos_after = region.pos
         region.pos = pos_before
@@ -140,8 +140,7 @@ class PublicKeyParser(KeyParser):
         message.add_key(info)
 
     def consume_rest(self, tag, message, region, info):
-        mpi_tuple = (info['mpi_values']['n'], info['mpi_values']['e'])
-        info['key'] = RSA.construct(long(i.read('uint')) for i in mpi_tuple)
+        info['key'] = RSA.construct(long(i.read('uint')) for i in info['mpi_values'])
         info['key_id'] = self.determine_key_id(info)
 
 ####################
@@ -153,21 +152,12 @@ class SecretKeyParser(PublicKeyParser):
         """Already have public key things"""
         s2k_type = region.read('uint:8')
         mpis = self.get_mpis(s2k_type, message, region, info)
-        
-        # Get mpi values from decrypted
-        rsa_d = Mpi.parse(mpis)
-        rsa_p = Mpi.parse(mpis)
-        rsa_q = Mpi.parse(mpis)
-        rsa_u = Mpi.parse(mpis)
 
-        mpi_tuple = (
-            info['mpi_values']['n'],
-            info['mpi_values']['e'],
-            rsa_d,
-            rsa_p,
-            rsa_q,
-            rsa_u,
-        )
+        # Get the rest of the mpi values and combine with those from public portion
+        mpi_values = Mpi.consume_private(mpis, info['algorithm'])
+        mpi_tuple = info['mpi_values'] + mpi_values
+
+        # Record key and key_id
         info['key'] = RSA.construct(long(i.read('uint')) for i in mpi_tuple)
         info['key_id'] = self.determine_key_id(info)
 
