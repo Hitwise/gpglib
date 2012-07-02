@@ -16,6 +16,10 @@ describe "decryption with rsa":
         self.assertEqual(message.decrypt(data.get_encrypted('big', 'rsa')), data.get_original('big'))
 
 describe "decryption with dsa":
+    it "works with small data":
+        message = EncryptedMessage(data.get_keys('dsa'))
+        self.assertEqual(message.decrypt(data.get_encrypted('small', 'dsa')), data.get_original('small'))
+
     it "works with big data":
         message = EncryptedMessage(data.get_keys('dsa'))
         self.assertEqual(message.decrypt(data.get_encrypted('big', 'dsa')), data.get_original('big'))
