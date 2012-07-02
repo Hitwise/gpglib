@@ -14,12 +14,12 @@ def get_file(name):
 def get_original(namespace):
     return get_file("data.%s.dump" % namespace)
 
-def get_encrypted(namespace):
-    return get_file("data.%s.dump.gpg" % namespace)
+def get_encrypted(namespace, algo):
+    return get_file("data.%s.dump.%s.gpg" % (namespace, algo))
 
-def get_pgp_key(namespace):
-    return get_file("key.%s.gpg" % namespace)
+def get_pgp_key(namespace, algo):
+    return get_file("key.%s.%s.gpg" % (namespace, algo))
     
-def get_keys():
-    key = Key(passphrase='blahandstuff').parse(get_pgp_key('secret'))
+def get_keys(algo):
+    key = Key(passphrase='blahandstuff').parse(get_pgp_key('secret', algo))
     return key.key_dict()
