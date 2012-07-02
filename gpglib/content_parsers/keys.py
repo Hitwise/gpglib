@@ -100,7 +100,7 @@ class KeyParser(Parser):
         fingerprint_data = ''.join(
             [ chr(info['key_version'])
             , bitstring.Bits(uint=info['ctime'], length=4*8).bytes
-            , chr(info['algorithm'])
+            , chr(info['key_algo'])
             , info['raw_mpi_bytes']
             ]
         )
@@ -122,17 +122,17 @@ class KeyParser(Parser):
         # Version of the public key
         # Creation time of the secret key
         # Public key algorithm used by this key
-        public_key_version, ctime,   public_key_algo = region.readlist("""
+        public_key_version, ctime,   key_algo = region.readlist("""
         uint:8,             uint:32, uint:8""")
 
         # Only version 4 packets are supported
         if public_key_version != 4:
             raise NotImplementedError("Public key versions != 4 are not supported. Upgrade your PGP!")
 
-        # only RSA is supported
-        self.only_implemented(public_key_algo, (1, 17, 16), "RSA and DSA keys")
+        # Get Key algorithm
+        key_algorithm = Mapped.algorithms.keys[key_algo]
         
-        return dict(tag=tag, key_version=public_key_version, ctime=ctime, algorithm=public_key_algo)
+        return dict(tag=tag, key_version=public_key_version, ctime=ctime, algorithm=key_algorithm, key_algo=key_algo)
 
 ####################
 ### PUBLIC KEY
@@ -143,8 +143,7 @@ class PublicKeyParser(KeyParser):
         message.add_key(info)
 
     def consume_rest(self, tag, message, region, info):
-        algorithm = Mapped.algorithms.keys[info['algorithm']]
-        info['key'] = algorithm.construct(list(long(i.read('uint')) for i in info['mpi_values']))
+        info['key'] = info['algorithm'].construct(list(long(i.read('uint')) for i in info['mpi_values']))
         info['key_id'] = self.determine_key_id(info)
 
 ####################
@@ -162,8 +161,7 @@ class SecretKeyParser(PublicKeyParser):
         mpi_tuple = info['mpi_values'] + mpi_values
 
         # Record key and key_id
-        algorithm = Mapped.algorithms.keys[info['algorithm']]
-        info['key'] = algorithm.construct(list(long(i.read('uint')) for i in mpi_tuple))
+        info['key'] = info['algorithm'].construct(list(long(i.read('uint')) for i in mpi_tuple))
         info['key_id'] = self.determine_key_id(info)
 
     def get_mpis(self, s2k_type, message, region, info):

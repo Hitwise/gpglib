@@ -38,6 +38,8 @@ class Algorithms(object):
 
     keys = Mapping("Key algorithm",
         { 1 : RSA # Encrypt or sign
+        , 2 : RSA # Encrypt only
+        , 3 : RSA # sign only
         , 16 : ElGamal # Encrypt only
         , 17 : DSA # Digital Signature Algorithm
         }
@@ -83,38 +85,57 @@ class Mpi(object):
         return region.read(mpi_length*8)
     
     ####################
+    ### RFC4880 5.1
+    ####################
+
+    @classmethod
+    def consume_encryption(cls, region, algorithm):
+        """Retrieve necessary MPI values from a public session key"""
+        if algorithm is RSA:
+            # multiprecision integer (MPI) of RSA encrypted value m**e mod n.
+            return (cls.parse(region), )
+        
+        elif algorithm is ElGamal:
+            # MPI of Elgamal (Diffie-Hellman) value g**k mod p.
+            # MPI of Elgamal (Diffie-Hellman) value m * y**k mod p.
+            return (cls.parse(region), cls.parse(region))
+        
+        else:
+            raise errors.PGPException("Unknown mpi algorithm for encryption %d" % algorithm)
+    
+    ####################
     ### RFC4880 5.5.2 and 5.5.3
     ####################
 
     @classmethod
     def consume_public(cls, region, algorithm):
         """Retrieve necessary MPI values from a public key for specified algorithm"""
-        if algorithm in (1, 2, 3):
+        if algorithm is RSA:
             return cls.rsa_mpis_public(region)
         
-        elif algorithm in (16, 20):
+        elif algorithm is ElGamal:
             return cls.elgamal_mpis_public(region)
         
-        elif algorithm == 17:
+        elif algorithm is DSA:
             return cls.dsa_mpis_public(region)
         
         else:
-            raise errors.PGPException("Unknown mpi algorithm %d" % algorithm)
+            raise errors.PGPException("Unknown mpi algorithm for public keys %d" % algorithm)
 
     @classmethod
     def consume_private(cls, region, algorithm):
         """Retrieve necessary MPI values from a private key for specified algorithm"""
-        if algorithm in (1, 2, 3):
+        if algorithm is RSA:
             return cls.rsa_mpis_private(region)
         
-        elif algorithm in (16, 20):
+        elif algorithm is ElGamal:
             return cls.elgamal_mpis_private(region)
         
-        elif algorithm == 17:
+        elif algorithm is DSA:
             return cls.dsa_mpis_private(region)
         
         else:
-            raise errors.PGPException("Unknown mpi algorithm %d" % algorithm)
+            raise errors.PGPException("Unknown mpi algorithm for secret keys %d" % algorithm)
 
     ####################
     ### RSA

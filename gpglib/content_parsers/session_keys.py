@@ -26,7 +26,7 @@ class PubSessionKeyParser(Parser):
             raise errors.PGPException("Data was encrypted with %s key '%d', which was't found" % (typ, key_id))
 
         # Read the encrypted session key
-        encrypted_session_key = Mpi.parse(region).bytes
+        encrypted_session_key = Mpi.consume_encryption(region, key_algorithm)[0].bytes
         
         # The encrypted session key is EME-PKCS1-encoded
         # (as described in section 13.1 of the RFC).
