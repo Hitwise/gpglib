@@ -2,7 +2,6 @@ from gpglib import utils, errors
 from crypt import Mapped, Mpi
 from base import Parser
 
-from Crypto.PublicKey import RSA
 from Crypto.Hash import SHA
 
 import itertools
@@ -23,8 +22,12 @@ class SignatureParser(Parser):
         # Complain if any values haven't been implemented yet
         self.only_implemented(version, (4, ), "version four signature packets")
         self.only_implemented(signature_type, (0x13, 0x18), "UserId and Subkey binding signatures")
-        self.only_implemented(public_key_algorithm, (1, ), "RSA Encrypt or sign public keys")
-        self.only_implemented(hash_algorithm, (2, ), "SHA-1 hashing")
+
+        # Get key algorithm
+        algorithm = Mapped.algorithms.keys[public_key_algorithm]
+        
+        # Get hasher
+        hasher = Mapped.algorithms.hashes[hash_algorithm]
 
         # Determine hashed data
         subsignature = region.read(hashed_subpacket_length * 8)
@@ -127,7 +130,7 @@ class KeyParser(Parser):
             raise NotImplementedError("Public key versions != 4 are not supported. Upgrade your PGP!")
 
         # only RSA is supported
-        self.only_implemented(public_key_algo, (1, ), "RSA public keys")
+        self.only_implemented(public_key_algo, (1, 17, 16), "RSA and DSA keys")
         
         return dict(tag=tag, key_version=public_key_version, ctime=ctime, algorithm=public_key_algo)
 
@@ -140,7 +143,8 @@ class PublicKeyParser(KeyParser):
         message.add_key(info)
 
     def consume_rest(self, tag, message, region, info):
-        info['key'] = RSA.construct(long(i.read('uint')) for i in info['mpi_values'])
+        algorithm = Mapped.algorithms.keys[info['algorithm']]
+        info['key'] = algorithm.construct(list(long(i.read('uint')) for i in info['mpi_values']))
         info['key_id'] = self.determine_key_id(info)
 
 ####################
@@ -158,7 +162,8 @@ class SecretKeyParser(PublicKeyParser):
         mpi_tuple = info['mpi_values'] + mpi_values
 
         # Record key and key_id
-        info['key'] = RSA.construct(long(i.read('uint')) for i in mpi_tuple)
+        algorithm = Mapped.algorithms.keys[info['algorithm']]
+        info['key'] = algorithm.construct(list(long(i.read('uint')) for i in mpi_tuple))
         info['key_id'] = self.determine_key_id(info)
 
     def get_mpis(self, s2k_type, message, region, info):

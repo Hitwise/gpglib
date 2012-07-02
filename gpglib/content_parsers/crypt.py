@@ -1,7 +1,8 @@
 from gpglib import errors
 
+from Crypto.PublicKey import RSA, DSA, ElGamal
+from Crypto.Hash import SHA, SHA256
 from Crypto.Cipher import CAST
-from Crypto.Hash import SHA
 import zlib
 
 ####################
@@ -31,6 +32,14 @@ class Algorithms(object):
 
     hashes = Mapping("Hash Algorithm",
         { 2 : SHA # SHA-1
+        , 8 : SHA256 # SHA-256
+        }
+    )
+
+    keys = Mapping("Key algorithm",
+        { 1 : RSA # Encrypt or sign
+        , 16 : ElGamal # Encrypt only
+        , 17 : DSA # Digital Signature Algorithm
         }
     )
 

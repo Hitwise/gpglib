@@ -1,6 +1,6 @@
+from crypt import Mpi, Mapped
 from gpglib import errors
 from base import Parser
-from crypt import Mpi
 
 from Crypto.Cipher import PKCS1_v1_5
 from Crypto import Random
@@ -15,12 +15,15 @@ class PubSessionKeyParser(Parser):
         version, key_id, key_algo = region.readlist("""
         uint:8, uint:64, uint:8""")
 
-        self.only_implemented(key_algo, (1, ), "session keys implemented with rsa")
+        # Get key algorithm
+        key_algorithm = Mapped.algorithms.keys[key_algo]
 
         # Get the key which was used to encrypt the session key
         key = message.keys.get(key_id)
         if not key:
-            raise errors.PGPException("Data was encrypted with RSA key '%d', which was't found" % key_id)
+            typ = key_algorithm.__name__
+            typ = typ[typ.rfind('.')+1:]
+            raise errors.PGPException("Data was encrypted with %s key '%d', which was't found" % (typ, key_id))
 
         # Read the encrypted session key
         encrypted_session_key = Mpi.parse(region).bytes
