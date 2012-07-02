@@ -23,8 +23,8 @@ if __name__ == '__main__':
     parser = get_parser()
     args = parser.parse_args()
     loop_kwargs = dict(
-          key_location = "tests/data/key.secret.gpg"
-        , message_location = 'tests/data/data.small.dump.gpg'
+          key_location = "tests/data/key.secret.rsa.gpg"
+        , message_location = 'tests/data/data.small.dump.rsa.gpg'
         , passphrase = 'blahandstuff'
         )
     
