@@ -3,6 +3,9 @@ from gpglib import errors
 from Crypto.PublicKey import RSA, DSA, ElGamal
 from Crypto.Hash import SHA, SHA256
 from Crypto.Cipher import CAST
+from Crypto import Random
+
+import bitstring
 import zlib
 
 ####################
@@ -67,6 +70,43 @@ class Mapped(object):
     ciphers = Ciphers
     algorithms = Algorithms
     compression = Compression
+    
+####################
+### PKCS
+####################
+
+class PKCS(object):
+    @classmethod
+    def consume(cls, region, key_algorithm, key):
+        # Get the mpi values from the region according to key_algorithm
+        # And decrypt them with the provided key
+        mpis = tuple(mpi.bytes for mpi in Mpi.consume_encryption(region, key_algorithm))
+        padded = bitstring.ConstBitStream(bytes=key.decrypt(mpis))
+
+        # Default decrypted to random values
+        # And only set to the actual decrypted value if all conditions are good
+        decrypted = Random.new().read(19)
+
+        # First byte needs to be 02
+        if padded.read("bytes:1") == '\x02':
+            # Find the next 00
+            pos_before = padded.bytepos
+            padded.find('0x00', bytealigned=True)
+            pos_after = padded.bytepos
+
+            # The ps section needs to be greater than 8
+            if pos_after - pos_before >= 8:
+                # Read in the seperator 0 byte
+                sep = padded.read("bytes:1")
+
+                # Decrypted value is the rest of the padded value
+                decrypted = padded.read("bytes")
+
+        # Read in and discard the rest of padded if not already read in
+        padded.read("bytes")
+
+        # Make a bitstream to read from
+        return bitstring.ConstBitStream(bytes=decrypted)
 
 ####################
 ### MPI VALUES

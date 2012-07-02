@@ -1,10 +1,6 @@
-from crypt import Mpi, Mapped
+from crypt import Mapped, PKCS
 from gpglib import errors
 from base import Parser
-
-from Crypto.Cipher import PKCS1_v1_5
-from Crypto import Random
-import bitstring
 
 class PubSessionKeyParser(Parser):
     """Parse public session key packet"""
@@ -24,30 +20,9 @@ class PubSessionKeyParser(Parser):
             typ = key_algorithm.__name__
             typ = typ[typ.rfind('.')+1:]
             raise errors.PGPException("Data was encrypted with %s key '%d', which was't found" % (typ, key_id))
-
-        # Read the encrypted session key
-        encrypted_session_key = Mpi.consume_encryption(region, key_algorithm)[0].bytes
         
-        # The encrypted session key is EME-PKCS1-encoded
-        # (as described in section 13.1 of the RFC).
-        # The sentinel value is generated for crypto reasons,
-        # and it is insecure to directly compare it to the output.
-        # We must only ever compare the checksum of the resulting key.
-        pkcs = PKCS1_v1_5.new(key)
-
-        # Generate the sentinel value
-        # (19 is the exact length of a valid decrypted passphrase)
-        sentinel = Random.new().read(19)
-
-        # The size of the key in bytes
-        key_size = (key.size() + 1) / 8
-
-        # Pad the key with zero's to the left until it's `key_size` bytes long
-        encrypted_session_key = encrypted_session_key.rjust(key_size, '\0')
-
-        # Decrypt and decode the session key
-        decrypted = pkcs.decrypt(encrypted_session_key, sentinel)
-        padded_session_key = bitstring.ConstBitStream(bytes=decrypted)
+        # Get the sesion key
+        padded_session_key = PKCS.consume(region, key_algorithm, key)
 
         # The algorithm used to encrypt the message is the first byte
         # The session key is the next 16 bytes
