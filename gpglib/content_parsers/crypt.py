@@ -123,6 +123,14 @@ class Mpi(object):
         # Read in the MPI bytes and return the resulting bitstream
         mpi_length = (raw_mpi_length + 7) / 8
         return region.read(mpi_length*8)
+
+    @classmethod
+    def retrieve(cls, region, mpis):
+        """
+            Helper to get multiple mpis from a region
+            Allows some nice declarativity below....
+        """
+        return tuple(cls.parse(region) for mpi in mpis)
     
     ####################
     ### RFC4880 5.1
@@ -132,13 +140,10 @@ class Mpi(object):
     def consume_encryption(cls, region, algorithm):
         """Retrieve necessary MPI values from a public session key"""
         if algorithm is RSA:
-            # multiprecision integer (MPI) of RSA encrypted value m**e mod n.
-            return (cls.parse(region), )
+            return cls.retrieve(region, ('m**e mod n', ))
         
         elif algorithm is ElGamal:
-            # MPI of Elgamal (Diffie-Hellman) value g**k mod p.
-            # MPI of Elgamal (Diffie-Hellman) value m * y**k mod p.
-            return (cls.parse(region), cls.parse(region))
+            return cls.retrieve(region, ('g**k mod p', 'm * y**k mod p'))
         
         else:
             raise errors.PGPException("Unknown mpi algorithm for encryption %d" % algorithm)
@@ -151,85 +156,28 @@ class Mpi(object):
     def consume_public(cls, region, algorithm):
         """Retrieve necessary MPI values from a public key for specified algorithm"""
         if algorithm is RSA:
-            return cls.rsa_mpis_public(region)
+            return cls.retrieve(region, ('n', 'e'))
         
         elif algorithm is ElGamal:
-            return cls.elgamal_mpis_public(region)
+            return cls.retrieve(region, ('p', 'g', 'y'))
         
         elif algorithm is DSA:
-            return cls.dsa_mpis_public(region)
+            return cls.retrieve(region, ('p', 'q', 'g', 'y'))
         
         else:
             raise errors.PGPException("Unknown mpi algorithm for public keys %d" % algorithm)
 
     @classmethod
     def consume_private(cls, region, algorithm):
-        """Retrieve necessary MPI values from a private key for specified algorithm"""
+        """Retrieve necessary MPI values from a secret key for specified algorithm"""
         if algorithm is RSA:
-            return cls.rsa_mpis_private(region)
+            return cls.retrieve(region, ('d', 'p', 'q', 'r'))
         
         elif algorithm is ElGamal:
-            return cls.elgamal_mpis_private(region)
+            return cls.retrieve(region, ('x', ))
         
         elif algorithm is DSA:
-            return cls.dsa_mpis_private(region)
+            return cls.retrieve(region, ('x', ))
         
         else:
             raise errors.PGPException("Unknown mpi algorithm for secret keys %d" % algorithm)
-
-    ####################
-    ### RSA
-    ####################
-
-    @classmethod
-    def rsa_mpis_public(cls, region):
-        """n and e"""
-        n = cls.parse(region)
-        e = cls.parse(region)
-        return (n, e)
-
-    @classmethod
-    def rsa_mpis_private(cls, region):
-        """d, p, q and r"""
-        d = cls.parse(region)
-        p = cls.parse(region)
-        q = cls.parse(region)
-        r = cls.parse(region)
-        return (d, p, q, r)
-    
-    ####################
-    ### ELGAMAL
-    ####################
-    
-    @classmethod
-    def elgamal_mpis_public(cls, region):
-        """p, g and y"""
-        p = cls.parse(region)
-        g = cls.parse(region)
-        y = cls.parse(region)
-        return (p, g, y)
-    
-    @classmethod
-    def elgamal_mpis_private(cls, region):
-        """x"""
-        x = cls.parse(region)
-        return (x, )
-    
-    ####################
-    ### DSA
-    ####################
-    
-    @classmethod
-    def dsa_mpis_public(cls, region):
-        """p, q, g and y"""
-        p = cls.parse(region)
-        q = cls.parse(region)
-        g = cls.parse(region)
-        y = cls.parse(region)
-        return (p, q, g, y)
-    
-    @classmethod
-    def dsa_mpis_private(cls, region):
-        """x"""
-        x = cls.parse(region)
-        return (x, )
