@@ -2,7 +2,7 @@ from gpglib import errors
 
 from Crypto.PublicKey import RSA, DSA, ElGamal
 from Crypto.Hash import SHA, SHA256
-from Crypto.Cipher import CAST
+from Crypto.Cipher import CAST, AES
 from Crypto import Random
 
 import bitstring
@@ -30,6 +30,7 @@ class Mapping(object):
 class Algorithms(object):
     encryption = Mapping("Symmetric encryption algorithm",
         { 3 : CAST # CAST5
+        , 7 : AES  # AES 128-bit key
         }
     )
 

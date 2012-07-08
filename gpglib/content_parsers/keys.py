@@ -182,8 +182,6 @@ class SecretKeyParser(PublicKeyParser):
 
             # Get a cipher object we can use to decrypt the key (and fail if we can't)
             cipher = Mapped.algorithms.encryption[encryption_algo]
-            if not cipher:
-                raise NotImplementedError("Symmetric encryption type '%d' hasn't been implemented" % algo)
 
             # This is the passphrase used to decrypt the secret key
             key_passphrase = self.parse_s2k(region, cipher, message.passphrase(message, info))
