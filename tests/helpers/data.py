@@ -11,11 +11,11 @@ def get_file(name):
     with open(file_path, 'r') as f:
         return f.read()
 
-def get_original(namespace):
-    return get_file("data.%s.dump" % namespace)
+def get_original(size):
+    return get_file("data.dump.%s" % size)
 
-def get_encrypted(namespace, algo):
-    return get_file("data.%s.dump.%s.gpg" % (namespace, algo))
+def get_encrypted(size, key, cipher):
+    return get_file("data.dump.%s.%s.%s.gpg" % (size, key, cipher))
 
 def get_pgp_key(namespace, algo):
     return get_file("key.%s.%s.gpg" % (namespace, algo))

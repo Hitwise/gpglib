@@ -6,20 +6,36 @@ from helpers import data
 
 import unittest
 
-describe "decryption with rsa":
-    it "works with with small data":
-        message = EncryptedMessage(data.get_keys('rsa'))
-        self.assertEqual(message.decrypt(data.get_encrypted('small', 'rsa')), data.get_original('small'))
+def create_decryption_check(size, key, cipher):
+    """
+        Generate a test function to tests a combination of factors for decryption
+        * Size of the message
+        * Public Key type
+        * Cipher used
+    """
+    def func(self):
+        message = EncryptedMessage(data.get_keys(key))
+        original = data.get_original(size)
+        decrypted = message.decrypt(data.get_encrypted(size, key, cipher))
+        self.assertEqual(decrypted, original)
 
-    it "works with big data":
-        message = EncryptedMessage(data.get_keys('rsa'))
-        self.assertEqual(message.decrypt(data.get_encrypted('big', 'rsa')), data.get_original('big'))
+    func.__name__ = "Testing key size=%s, key=%s, cipher=%s" % (size, key, cipher)
+    func.__test_name__ = func.__name__
+    return func
 
-describe "decryption with dsa":
-    it "works with small data":
-        message = EncryptedMessage(data.get_keys('dsa'))
-        self.assertEqual(message.decrypt(data.get_encrypted('small', 'dsa')), data.get_original('small'))
+def generate_funcs():
+    """
+        Use create_decryption_check to generate test functions
+        These are used in TestCase class created below
+    """
+    args = {}
+    for size in ('small', 'big'):
+        for key in ('rsa', 'dsa'):
+            for cipher in ('cast5', 'aes'):
+                tester = create_decryption_check(size, key, cipher)
+                args[tester.__name__] = tester
+    return args
 
-    it "works with big data":
-        message = EncryptedMessage(data.get_keys('dsa'))
-        self.assertEqual(message.decrypt(data.get_encrypted('big', 'dsa')), data.get_original('big'))
+# The class that holds all the tests
+TestDecryption = type("TestDecryption", (unittest.TestCase, ), generate_funcs())
+TestDecryption._is_noy_spec = True
