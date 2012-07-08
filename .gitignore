@@ -5,3 +5,5 @@ dist/
 *.swp
 *~
 docs/_build
+tests/data/gpg/random_seed
+
