@@ -8,8 +8,8 @@ class PubSessionKeyParser(Parser):
         # Version of the packet we're parsing
         # The id of the key used to encrypt the session key
         # The public key algorithm used to encrypt the session key
-        version, key_id, key_algo = region.readlist("""
-        uint:8, uint:64, uint:8""")
+        version, key_id,  key_algo = region.readlist("""
+        uint:8,  uint:64, uint:8""")
 
         # Get key algorithm
         key_algorithm = Mapped.algorithms.keys[key_algo]
