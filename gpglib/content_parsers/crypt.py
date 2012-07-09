@@ -7,6 +7,7 @@ from Crypto import Random
 
 import bitstring
 import zlib
+import bz2
 
 ####################
 ### MAPPINGS
@@ -35,17 +36,17 @@ class Algorithms(object):
     )
 
     hashes = Mapping("Hash Algorithm",
-        { 2 : SHA # SHA-1
+        { 2 : SHA    # SHA-1
         , 8 : SHA256 # SHA-256
         }
     )
 
     keys = Mapping("Key algorithm",
-        { 1 : RSA # Encrypt or sign
-        , 2 : RSA # Encrypt only
-        , 3 : RSA # sign only
-        , 16 : ElGamal # Encrypt only
-        , 17 : DSA # Digital Signature Algorithm
+        { 1  : RSA     # Encrypt or Sign
+        , 2  : RSA     # Encrypt Only
+        , 3  : RSA     # Sign Only
+        , 16 : ElGamal # Encrypt Only
+        , 17 : DSA     # Digital Signature Algorithm
         }
     )
 
@@ -56,14 +57,18 @@ class Ciphers(object):
     )
 
 class Compression(object):
-    def decompress_zlib(compressed):
-        # The -15 at the end is the window size.
-        # It says to ignore the zlib header (because it's negative) and that the
-        # data is compressed with up to 15 bits of compression.
+    def decompress_zip(compressed):
+        """
+            To decompress zip, we use zlib with a -15 window size.
+            It says to ignore the zlib header
+            and that the data is compressed with up to 15 bits of compression.
+        """
         return zlib.decompress(compressed, -15)
     
     decompression = Mapping("Decompressor",
-        { 1 : decompress_zlib
+        { 1 : decompress_zip  # ZIP
+        , 2 : zlib.decompress # ZLIB
+        , 3 : bz2.decompress  # BZIP2
         }
     )
 
