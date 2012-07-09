@@ -40,7 +40,7 @@ def generate_funcs():
 
     msgs = ('small', 'big')
     keys = ('rsa', 'dsa')
-    ciphers = ('cast5', 'aes')
+    ciphers = ('cast5', 'aes', 'blowfish')
     compression = ('zip', 'zlib', 'bzip2', 'none')
 
     # Create a test for each combination of variables

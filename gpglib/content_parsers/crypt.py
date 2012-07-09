@@ -2,7 +2,7 @@ from gpglib import errors
 
 from Crypto.PublicKey import RSA, DSA, ElGamal
 from Crypto.Hash import SHA, SHA256
-from Crypto.Cipher import CAST, AES
+from Crypto.Cipher import CAST, AES, Blowfish
 from Crypto import Random
 
 import bitstring
@@ -30,8 +30,9 @@ class Mapping(object):
 
 class Algorithms(object):
     encryption = Mapping("Symmetric encryption algorithm",
-        { 3 : CAST # CAST5
-        , 7 : AES  # AES 128-bit key
+        { 3 : CAST     # CAST5 128-bit key
+        , 4 : Blowfish # Blowfish 128-bit key
+        , 7 : AES      # AES 128-bit key
         }
     )
 
