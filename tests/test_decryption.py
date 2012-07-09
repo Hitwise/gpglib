@@ -15,8 +15,8 @@ def create_decryption_check(msg_type, **options):
         * Cipher used
     """
     def func(self):
-        # Data caches all the keys for get_all_keys
-        keys = data.get_all_keys()
+        # Data caches all the keys for get_secret_keys
+        keys = data.get_secret_keys()
 
         # Make the message, get the original
         message = EncryptedMessage(keys)

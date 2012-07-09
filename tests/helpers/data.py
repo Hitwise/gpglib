@@ -25,9 +25,9 @@ def get_pgp_key(namespace, algo):
     fn = os.path.join("keys", "key.%s.%s.gpg" % (namespace, algo))
     return get_file(fn)
 
-def get_all_keys():
+def get_secret_keys():
     """
-        Get dictionary of {key_id:key} for all keys in the tests/data/keys folder
+        Get dictionary of {key_id:key} for all secret keys in the tests/data/keys folder
         Memoized in the cached dictionary
     """
     if 'keys' not in cached:
@@ -35,7 +35,7 @@ def get_all_keys():
         key_folder = os.path.join(this_folder, '..', 'data', 'keys')
         for key_name in os.listdir(key_folder):
             location = os.path.join(key_folder, key_name)
-            if os.path.isfile(location) and key_name.endswith("gpg"):
+            if os.path.isfile(location) and key_name.endswith("gpg") and 'secret' in key_name:
                 with open(location, 'r') as k:
                     key = Key(passphrase="blahandstuff").parse(k.read())
                     keys.update(key.key_dict())
