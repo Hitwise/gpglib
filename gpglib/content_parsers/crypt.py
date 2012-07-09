@@ -102,6 +102,20 @@ class PKCS(object):
         mpis = tuple(mpi.bytes for mpi in Mpi.consume_encryption(region, key_algorithm))
         padded = bitstring.ConstBitStream(bytes=key.decrypt(mpis))
 
+        # Unpad the mpis
+        decrypted = cls.unpad(padded)
+
+        # The size of the key is the amount in padded_session_key
+        # Minus the algorithm at the front and the checksum at the end
+        key_size = (decrypted.len - decrypted.pos) / 8 - 1 - 2
+
+        # The algorithm used to encrypt the message is the first byte
+        # The session key is the next <key_size> bytes
+        # The checksum is the last two bytes
+        return decrypted.readlist("uint:8, bytes:%d, uint:16""" % key_size)
+
+    @classmethod
+    def unpad(cls, padded):
         # If decrypted isn't set by the end it is replaced with random bytes
         decrypted = None
 
@@ -125,14 +139,7 @@ class PKCS(object):
             # MPIs weren't valid, use random bytes intead
             decrypted = bitstring.ConstBitStream(bytes=Random.new().read(19))
 
-        # The size of the key is the amount in padded_session_key
-        # Minus the algorithm at the front and the checksum at the end
-        key_size = (decrypted.len - decrypted.pos) / 8 - 1 - 2
-
-        # The algorithm used to encrypt the message is the first byte
-        # The session key is the next <key_size> bytes
-        # The checksum is the last two bytes
-        return decrypted.readlist("uint:8, bytes:%d, uint:16""" % key_size)
+        return decrypted
 
 ####################
 ### MPI VALUES
