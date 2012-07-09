@@ -105,7 +105,7 @@ class PKCS(object):
         # Unpad the mpis
         decrypted = cls.unpad(padded)
 
-        # The size of the key is the amount in padded_session_key
+        # The size of the key is the amount in decrypted
         # Minus the algorithm at the front and the checksum at the end
         key_size = (decrypted.len - decrypted.pos) / 8 - 1 - 2
 
