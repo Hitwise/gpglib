@@ -4,9 +4,10 @@ from gpglib.structures import EncryptedMessage
 
 from helpers import data
 
+import itertools
 import unittest
 
-def create_decryption_check(size, key, cipher):
+def create_decryption_check(msg_type, **options):
     """
         Generate a test function to tests a combination of factors for decryption
         * Size of the message
@@ -14,12 +15,19 @@ def create_decryption_check(size, key, cipher):
         * Cipher used
     """
     def func(self):
-        message = EncryptedMessage(data.get_keys(key))
-        original = data.get_original(size)
-        decrypted = message.decrypt(data.get_encrypted(size, key, cipher))
+        # Data caches all the keys for get_all_keys
+        keys = data.get_all_keys()
+
+        # Make the message, get the original
+        message = EncryptedMessage(keys)
+        original = data.get_original(msg_type)
+
+        # Decrypt the encrypted and compare to the original
+        decrypted = message.decrypt(data.get_encrypted(**options))
         self.assertEqual(decrypted, original)
 
-    func.__name__ = "Testing key size=%s, key=%s, cipher=%s" % (size, key, cipher)
+    values = ', '.join("%s=%s" % (k, v) for k, v in sorted(options.items()))
+    func.__name__ = "Testing key %s" % values
     func.__test_name__ = func.__name__
     return func
 
@@ -29,11 +37,17 @@ def generate_funcs():
         These are used in TestCase class created below
     """
     args = {}
-    for size in ('small', 'big'):
-        for key in ('rsa', 'dsa'):
-            for cipher in ('cast5', 'aes'):
-                tester = create_decryption_check(size, key, cipher)
-                args[tester.__name__] = tester
+
+    msgs = ('small', 'big')
+    keys = ('rsa', 'dsa')
+    ciphers = ('cast5', 'aes')
+    compression = ('zip', 'zlib', 'bzip2', 'none')
+
+    # Create a test for each combination of variables
+    for key, cipher, compression, msg in itertools.product(keys, ciphers, compression, msgs):
+        tester = create_decryption_check(msg, msg=msg, key=key, cipher=cipher, compression=compression)
+        args[tester.__name__] = tester
+
     return args
 
 # The class that holds all the tests

@@ -21,12 +21,13 @@ Or clone the git repo: https://github.com/Hitwise/gpglib.
 Making test data
 ================
 
-This is what I did to get the data in test.data.
+This is what I did to get the data in tests/data.
 
-Inside tests/data::
+From within tests/data::
 
     $ gpg --gen-key --homedir ./gpg
-    # I gave it all default options, username Stephen and password "blahandstuff"
+    # Once with RSA encrypt and sign, username Stephen and password "blahandstuff"
+    # And again with DSA/Elgamal, username Bobby and password "blahandstuff"
 
 Then find the keyid::
 
@@ -38,14 +39,23 @@ Then find the keyid::
         # sub   2048R/80C7020A 2012-06-15
     # Here, the key we want is "80C7020A"
     
-Then with that keyid export the secret and public keys:
+Then with that keyid export the secret and public keys for both the rsa and dsa keys:
 
-    $ gpg --export 80C7020A > key.public.gpg
-    $ gpg --export-secret-key 80C7020A > key.secret.gpg
+    $ gpg --export 80C7020A > key.public.rsa.gpg
+    $ gpg --export-secret-key 80C7020A > key.secret.rsa.gpg
 
-I then created data.small.dump and data.big.dump as random json structures (the big on is from http://json.org/example.html) and did the following to make the encrypted .gpg equivalent::
+I then created dump.small and dump.big as random json structures (the big on is from http://json.org/example.html).
+
+Then used the following command to populate the tests/data/encrypted folder:
     
-    $ gpg -o data.dump.gpg --cipher-algo CAST5 --compress-algo ZIP --yes --disable-mdc --homedir ./gpg  -r Stephen --encrypt data.dump
+    $ gpg -o encrypted/<key>/<cipher>/<compression>/<msg>.gpg --cipher-algo <cipher> --compress-algo <compression> --yes --disable-mdc --homedir ./gpg -r <name for key> --encrypt dump.<msg>
+
+Where:
+
+ * <key> is rsa or dsa
+ * <cipher> is cast5 or aes
+ * <compression> is zip, zlib or bzip2
+ * <msg> is small and big for the two examples I have
 
 Tests
 =====
