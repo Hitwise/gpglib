@@ -94,21 +94,16 @@ class PKCS(object):
             The result will then be
             algorithm | session_key | checksum
 
-            Where the size of the session_key is key_size as calculated by this function.
-
-            Returned is (result, key_size)
+            These values are retrieved from result and returned.
+            If, however, mpis don't follow pattern above, then random bytes are used instead
         """
         # Get the mpi values from the region according to key_algorithm
         # And decrypt them with the provided key
         mpis = tuple(mpi.bytes for mpi in Mpi.consume_encryption(region, key_algorithm))
         padded = bitstring.ConstBitStream(bytes=key.decrypt(mpis))
 
-        # Default decrypted to random values
-        # And only set to the actual decrypted value if all conditions are good
-        decrypted = Random.new().read(19)
-
-        # Default key size to 0
-        key_size = 0
+        # If decrypted isn't set by the end it is replaced with random bytes
+        decrypted = None
 
         # First byte needs to be 02
         if padded.read("bytes:1") == '\x02':
@@ -120,21 +115,24 @@ class PKCS(object):
             # The ps section needs to be greater than 8
             if pos_after - pos_before >= 8:
                 # Read in the seperator 0 byte
+                # Gauranteed to be zero given use of find above
                 sep = padded.read("bytes:1")
 
-                # Determine the key size of the session key
-                # Should be one byte less than the amount left in padded minus the checksum
-                # (checksum is the last 2 bytes)
-                key_size = (padded.len - padded.pos) / 8 - 2 - 1
-
                 # Decrypted value is the rest of the padded value
-                decrypted = padded.read("bytes")
+                decrypted = padded
 
-        # Read in and discard the rest of padded if not already read in
-        padded.read("bytes")
+        if decrypted is None:
+            # MPIs weren't valid, use random bytes intead
+            decrypted = bitstring.ConstBitStream(bytes=Random.new().read(19))
 
-        # Make a bitstream to read from
-        return bitstring.ConstBitStream(bytes=decrypted), key_size
+        # The size of the key is the amount in padded_session_key
+        # Minus the algorithm at the front and the checksum at the end
+        key_size = (decrypted.len - decrypted.pos) / 8 - 1 - 2
+
+        # The algorithm used to encrypt the message is the first byte
+        # The session key is the next <key_size> bytes
+        # The checksum is the last two bytes
+        return decrypted.readlist("uint:8, bytes:%d, uint:16""" % key_size)
 
 ####################
 ### MPI VALUES
