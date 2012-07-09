@@ -1,8 +1,8 @@
 from gpglib import errors
 
+from Crypto.Cipher import CAST, AES, Blowfish, DES3
 from Crypto.PublicKey import RSA, DSA, ElGamal
 from Crypto.Hash import SHA, SHA256
-from Crypto.Cipher import CAST, AES, Blowfish
 from Crypto import Random
 
 import bitstring
@@ -30,7 +30,8 @@ class Mapping(object):
 
 class Algorithms(object):
     encryption = Mapping("Symmetric encryption algorithm",
-        { 3 : CAST     # CAST5 128-bit key
+        { 2 : DES3     # TripleDES 168 bit key derived from 192
+        , 3 : CAST     # CAST5 128-bit key
         , 4 : Blowfish # Blowfish 128-bit key
         , 7 : AES      # AES 128-bit key
         }
@@ -85,6 +86,18 @@ class Mapped(object):
 class PKCS(object):
     @classmethod
     def consume(cls, region, key_algorithm, key):
+        """
+            Get next mpi values from region as according to key_algorithm
+            Decrypt those mpis and then parse them as
+            0x2 | random bytes | 0x0 | result
+
+            The result will then be
+            algorithm | session_key | checksum
+
+            Where the size of the session_key is key_size as calculated by this function.
+
+            Returned is (result, key_size)
+        """
         # Get the mpi values from the region according to key_algorithm
         # And decrypt them with the provided key
         mpis = tuple(mpi.bytes for mpi in Mpi.consume_encryption(region, key_algorithm))
@@ -93,6 +106,9 @@ class PKCS(object):
         # Default decrypted to random values
         # And only set to the actual decrypted value if all conditions are good
         decrypted = Random.new().read(19)
+
+        # Default key size to 0
+        key_size = 0
 
         # First byte needs to be 02
         if padded.read("bytes:1") == '\x02':
@@ -106,6 +122,11 @@ class PKCS(object):
                 # Read in the seperator 0 byte
                 sep = padded.read("bytes:1")
 
+                # Determine the key size of the session key
+                # Should be one byte less than the amount left in padded minus the checksum
+                # (checksum is the last 2 bytes)
+                key_size = (padded.len - padded.pos) / 8 - 2 - 1
+
                 # Decrypted value is the rest of the padded value
                 decrypted = padded.read("bytes")
 
@@ -113,7 +134,7 @@ class PKCS(object):
         padded.read("bytes")
 
         # Make a bitstream to read from
-        return bitstring.ConstBitStream(bytes=decrypted)
+        return bitstring.ConstBitStream(bytes=decrypted), key_size
 
 ####################
 ### MPI VALUES
