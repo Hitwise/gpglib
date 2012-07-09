@@ -53,7 +53,7 @@ Then used the following command to populate the tests/data/encrypted folder:
 Where:
 
  * <key> is rsa or dsa
- * <cipher> is cast5, aes or blowfish
+ * <cipher> is cast5, aes, 3des or blowfish
  * <compression> is zip, zlib or bzip2
  * <msg> is small and big for the two examples I have
 
