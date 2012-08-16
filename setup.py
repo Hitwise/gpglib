@@ -1,9 +1,12 @@
 from setuptools import setup, find_packages
 
+# All the packages except test
+packages = [pkg for pkg in find_packages() if not pkg.startswith('tests')]
+
 setup(
       name = "gpglib"
-    , version = "0.1.0"
-    , packages = find_packages()
+    , version = "0.1.1"
+    , packages = packages
     , install_requires =
       [ 'pycrypto'
       , 'bitstring'
